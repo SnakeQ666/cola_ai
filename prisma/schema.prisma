@@ -1,0 +1,168 @@
+// Prisma Schema
+// 阿里云RDS PostgreSQL数据库
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?   // 使用bcrypt加密
+  avatar        String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // 关联
+  datasets      Dataset[]
+  analyses      Analysis[]
+  visualizations Visualization[]
+  accounts      Account[]
+  sessions      Session[]
+  
+  @@map("users")
+}
+
+// NextAuth.js需要的表
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// 数据集表
+model Dataset {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  fileUrl     String   // OSS存储路径
+  fileSize    Int      // 文件大小（字节）
+  fileType    String   // csv, excel, json
+  rowCount    Int?     // 数据行数
+  columnCount Int?     // 列数
+  columns     Json?    // 列信息
+  status      String   @default("processing") // processing, ready, error
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // 关联
+  analyses    Analysis[]
+  visualizations Visualization[]
+  
+  @@map("datasets")
+  @@index([userId])
+}
+
+// AI分析会话表
+model Analysis {
+  id              String   @id @default(cuid())
+  title           String
+  conversationId  String?  // Dify对话ID
+  status          String   @default("active") // active, archived
+  
+  datasetId       String?
+  dataset         Dataset? @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // 关联
+  messages        Message[]
+  visualizations  Visualization[]
+  
+  @@map("analyses")
+  @@index([userId])
+  @@index([datasetId])
+}
+
+// 对话消息表
+model Message {
+  id          String   @id @default(cuid())
+  role        String   // user, assistant
+  content     String   @db.Text
+  metadata    Json?    // 额外信息
+  
+  analysisId  String
+  analysis    Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("messages")
+  @@index([analysisId])
+}
+
+// 可视化看板表
+model Visualization {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  chartType   String   // line, bar, pie, scatter, etc.
+  config      Json     // ECharts配置
+  data        Json?    // 图表数据（可选）
+  
+  datasetId   String?
+  dataset     Dataset? @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  
+  analysisId  String?
+  analysis    Analysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("visualizations")
+  @@index([userId])
+  @@index([datasetId])
+  @@index([analysisId])
+}
+

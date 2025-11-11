@@ -1,0 +1,91 @@
+# 阿里云Serverless应用引擎(SAE)配置文件
+apiVersion: v1
+kind: Application
+
+metadata:
+  name: ai-data-analysis
+  namespace: default
+  description: AI数据分析平台
+
+spec:
+  # 实例配置
+  replicas:
+    min: 1        # 最小实例数
+    max: 10       # 最大实例数（根据流量自动扩缩容）
+  
+  # 资源配置
+  cpu: 1000       # CPU: 1核 (单位: millicores)
+  memory: 2048    # 内存: 2GB (单位: MB)
+  
+  # 部署配置
+  packageType: Image
+  imageUrl: registry.cn-hangzhou.aliyuncs.com/your-namespace/ai-analysis:latest
+  
+  # 健康检查
+  readiness:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    httpGet:
+      path: /api/health
+      port: 3000
+  
+  liveness:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    httpGet:
+      path: /api/health
+      port: 3000
+  
+  # 环境变量
+  envs:
+    - name: NODE_ENV
+      value: "production"
+    - name: NEXT_TELEMETRY_DISABLED
+      value: "1"
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: db-secret
+          key: connection-string
+    - name: NEXTAUTH_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: auth-secret
+          key: secret
+    - name: DIFY_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: dify-secret
+          key: api-key
+    - name: OSS_REGION
+      value: "oss-cn-hangzhou"
+    - name: OSS_BUCKET
+      value: "your-bucket-name"
+    - name: OSS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: oss-secret
+          key: access-key-id
+    - name: OSS_ACCESS_KEY_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: oss-secret
+          key: access-key-secret
+
+  # 网络配置
+  network:
+    internetSlbId: ""  # 公网SLB ID（自动分配）
+    
+  # 自动扩缩容策略
+  autoScaling:
+    enable: true
+    minReplicas: 1
+    maxReplicas: 10
+    metrics:
+      - type: CPU
+        targetAverageUtilization: 70
+      - type: Memory
+        targetAverageUtilization: 80
+
