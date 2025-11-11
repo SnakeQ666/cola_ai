@@ -111,35 +111,68 @@ jobs:
           # 设置默认区域
           SAE_REGION=${SAE_REGION:-cn-hangzhou}
           
-          # 安装阿里云 CLI
-          curl -sS https://aliyuncli.alicdn.com/aliyun-cli-linux-latest-amd64.tgz -o aliyun-cli.tgz
-          sudo tar zxvf aliyun-cli.tgz -C /usr/local/bin
-          sudo chmod +x /usr/local/bin/aliyun
+          # 安装阿里云 Python SDK
+          python3 -m pip install --upgrade pip --quiet
+          python3 -m pip install aliyun-python-sdk-core aliyun-python-sdk-sae --quiet
           
-          # 配置阿里云 CLI
-          aliyun configure set \
-            --profile default \
-            --mode AK \
-            --access-key-id ${ALIYUN_ACCESS_KEY_ID} \
-            --access-key-secret ${ALIYUN_ACCESS_KEY_SECRET} \
-            --region ${SAE_REGION} \
-            --language zh
+          # 使用 Python 脚本调用 SAE API
+          python3 <<EOF
+          from aliyunsdkcore.client import AcsClient
+          from aliyunsdkcore.request import CommonRequest
+          import json
+          import os
           
-          # 部署应用到 SAE
-          echo "📦 使用镜像: ${{ steps.version.outputs.image_tag }}"
-          aliyun sae UpdateApplication \
-            --ApplicationId ${SAE_APP_ID} \
-            --ImageUrl "${{ steps.version.outputs.image_tag }}" \
-            --Deploy
+          access_key_id = os.environ['ALIYUN_ACCESS_KEY_ID']
+          access_key_secret = os.environ['ALIYUN_ACCESS_KEY_SECRET']
+          region = os.environ['SAE_REGION']
+          app_id = os.environ['SAE_APP_ID']
+          image_url = "${{ steps.version.outputs.image_tag }}"
           
-          if [ $? -eq 0 ]; then
-            echo "✅ SAE 部署成功！"
-            echo "🔗 应用 ID: ${SAE_APP_ID}"
-            echo "📦 镜像版本: ${{ steps.version.outputs.version }}"
-          else
-            echo "❌ SAE 部署失败"
-            exit 1
-          fi
+          # 创建客户端
+          client = AcsClient(access_key_id, access_key_secret, region)
+          
+          # 先更新应用配置
+          print("📝 更新应用配置...")
+          update_request = CommonRequest()
+          update_request.set_accept_format('json')
+          update_request.set_domain('sae.' + region + '.aliyuncs.com')
+          update_request.set_method('PUT')
+          update_request.set_protocol_type('https')
+          update_request.set_version('2019-05-06')
+          update_request.set_action_name('UpdateApplication')
+          update_request.add_body_params('AppId', app_id)
+          update_request.add_body_params('ImageUrl', image_url)
+          
+          try:
+              update_response = client.do_action_with_exception(update_request)
+              print("✅ 应用配置更新成功")
+          except Exception as e:
+              print(f"⚠️  配置更新失败（可能已是最新）: {e}")
+          
+          # 部署应用
+          print("🚀 开始部署应用...")
+          deploy_request = CommonRequest()
+          deploy_request.set_accept_format('json')
+          deploy_request.set_domain('sae.' + region + '.aliyuncs.com')
+          deploy_request.set_method('POST')
+          deploy_request.set_protocol_type('https')
+          deploy_request.set_version('2019-05-06')
+          deploy_request.set_action_name('DeployApplication')
+          deploy_request.add_body_params('AppId', app_id)
+          deploy_request.add_body_params('ImageUrl', image_url)
+          
+          try:
+              deploy_response = client.do_action_with_exception(deploy_request)
+              response_data = json.loads(deploy_response.decode('utf-8'))
+              print("✅ SAE 部署成功！")
+              print(f"🔗 应用 ID: {app_id}")
+              print(f"📦 镜像: {image_url}")
+              if 'Data' in response_data:
+                  print(f"📋 部署 ID: {response_data.get('Data', {}).get('ChangeOrderId', 'N/A')}")
+          except Exception as e:
+              print(f"❌ SAE 部署失败: {e}")
+              exit(1)
+          EOF
 
       - name: Output deployment information
         run: |
