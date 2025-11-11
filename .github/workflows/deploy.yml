@@ -99,16 +99,53 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
-      - name: Output image information
+      - name: Deploy to Alibaba Cloud SAE
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+          SAE_APP_ID: ${{ secrets.SAE_APP_ID }}
+          SAE_REGION: ${{ secrets.SAE_REGION }}
         run: |
-          echo "✅ 镜像构建并推送成功！"
+          echo "🚀 开始部署到 SAE..."
+          
+          # 设置默认区域
+          SAE_REGION=${SAE_REGION:-cn-hangzhou}
+          
+          # 安装阿里云 CLI
+          curl -sS https://aliyuncli.alicdn.com/aliyun-cli-linux-latest-amd64.tgz -o aliyun-cli.tgz
+          sudo tar zxvf aliyun-cli.tgz -C /usr/local/bin
+          sudo chmod +x /usr/local/bin/aliyun
+          
+          # 配置阿里云 CLI
+          aliyun configure set \
+            --profile default \
+            --mode AK \
+            --access-key-id ${ALIYUN_ACCESS_KEY_ID} \
+            --access-key-secret ${ALIYUN_ACCESS_KEY_SECRET} \
+            --region ${SAE_REGION} \
+            --language zh
+          
+          # 部署应用到 SAE
+          echo "📦 使用镜像: ${{ steps.version.outputs.image_tag }}"
+          aliyun sae UpdateApplication \
+            --ApplicationId ${SAE_APP_ID} \
+            --ImageUrl "${{ steps.version.outputs.image_tag }}" \
+            --Deploy
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ SAE 部署成功！"
+            echo "🔗 应用 ID: ${SAE_APP_ID}"
+            echo "📦 镜像版本: ${{ steps.version.outputs.version }}"
+          else
+            echo "❌ SAE 部署失败"
+            exit 1
+          fi
+
+      - name: Output deployment information
+        run: |
+          echo "✅ 部署完成！"
           echo "📦 镜像地址: ${{ steps.version.outputs.image_tag }}"
           echo "📦 最新标签: ${{ steps.version.outputs.image_latest }}"
           echo "🔖 版本: ${{ steps.version.outputs.version }}"
-          echo ""
-          echo "下一步："
-          echo "1. 登录阿里云 SAE 控制台"
-          echo "2. 选择应用 → 部署应用"
-          echo "3. 镜像地址填写: ${{ steps.version.outputs.image_tag }}"
-          echo "4. 点击部署"
+          echo "🚀 已自动部署到 SAE"
 
