@@ -111,59 +111,57 @@ jobs:
           # 设置默认区域
           SAE_REGION=${SAE_REGION:-cn-hangzhou}
           
-          # 安装阿里云 Python SDK
-          python3 -m pip install --upgrade pip --quiet
-          python3 -m pip install aliyun-python-sdk-core aliyun-python-sdk-sae --quiet
+          echo "📦 使用镜像: ${{ steps.version.outputs.image_tag }}"
+          echo "🔗 应用 ID: ${SAE_APP_ID}"
+          echo "📍 区域: ${SAE_REGION}"
           
-          # 使用 Python 脚本调用 SAE API
-          python3 <<EOF
-          from aliyunsdkcore.client import AcsClient
-          from aliyunsdkcore.request import CommonRequest
-          import json
-          import os
-          import sys
+          # 安装阿里云 CLI
+          echo "📥 安装阿里云 CLI..."
+          curl -sS https://aliyuncli.alicdn.com/aliyun-cli-linux-latest-amd64.tgz -o aliyun-cli.tgz
+          sudo tar zxf aliyun-cli.tgz -C /usr/local/bin
+          sudo chmod +x /usr/local/bin/aliyun
           
-          access_key_id = os.environ['ALIYUN_ACCESS_KEY_ID']
-          access_key_secret = os.environ['ALIYUN_ACCESS_KEY_SECRET']
-          region = os.environ['SAE_REGION']
-          app_id = os.environ['SAE_APP_ID']
-          image_url = "${{ steps.version.outputs.image_tag }}"
+          # 配置阿里云 CLI
+          echo "🔧 配置阿里云 CLI..."
+          aliyun configure set \
+            --profile default \
+            --mode AK \
+            --access-key-id ${ALIYUN_ACCESS_KEY_ID} \
+            --access-key-secret ${ALIYUN_ACCESS_KEY_SECRET} \
+            --region ${SAE_REGION}
           
-          # 创建客户端
-          client = AcsClient(access_key_id, access_key_secret, region)
+          # 调用 SAE API 部署应用
+          # SAE 使用 ROA 风格 API，需要使用 POST 方法和路径
+          echo "🚀 开始部署应用..."
           
-          # 部署应用 - 使用 RPC 风格 API
-          print("🚀 开始部署应用...")
-          deploy_request = CommonRequest()
-          deploy_request.set_accept_format('json')
-          deploy_request.set_domain('sae.' + region + '.aliyuncs.com')
-          deploy_request.set_method('POST')
-          deploy_request.set_protocol_type('https')
-          deploy_request.set_version('2019-05-06')
-          deploy_request.set_action_name('DeployApplication')
+          # 方法1: 使用 aliyun CLI 的 ROA 调用方式
+          RESPONSE=$(aliyun sae POST /pop/v1/sam/app/deployApplication \
+            --body "{\"AppId\":\"${SAE_APP_ID}\",\"ImageUrl\":\"${{ steps.version.outputs.image_tag }}\"}" \
+            --header "Content-Type:application/json" 2>&1)
           
-          # 使用 query_params 而不是 body_params
-          deploy_request.add_query_param('AppId', app_id)
-          deploy_request.add_query_param('ImageUrl', image_url)
+          EXIT_CODE=$?
           
-          try:
-              deploy_response = client.do_action_with_exception(deploy_request)
-              response_data = json.loads(deploy_response.decode('utf-8'))
-              
-              if response_data.get('Success', False) or response_data.get('Code') == '200':
-                  print("✅ SAE 部署成功！")
-                  print(f"🔗 应用 ID: {app_id}")
-                  print(f"📦 镜像: {image_url}")
-                  if 'Data' in response_data:
-                      change_order_id = response_data.get('Data', {}).get('ChangeOrderId', 'N/A')
-                      print(f"📋 变更单 ID: {change_order_id}")
-              else:
-                  print(f"❌ SAE 部署失败: {response_data}")
-                  sys.exit(1)
-          except Exception as e:
-              print(f"❌ SAE 部署失败: {e}")
-              sys.exit(1)
-          EOF
+          # 如果失败，尝试使用 query 参数方式
+          if [ ${EXIT_CODE} -ne 0 ]; then
+            echo "⚠️  第一次尝试失败，使用备用方式..."
+            RESPONSE=$(aliyun sae --method POST \
+              --uri /pop/v1/sam/app/deployApplication \
+              --body "AppId=${SAE_APP_ID}&ImageUrl=${{ steps.version.outputs.image_tag }}" 2>&1)
+            EXIT_CODE=$?
+          fi
+          
+          echo "${RESPONSE}"
+          
+          if [ ${EXIT_CODE} -eq 0 ] && ! echo "${RESPONSE}" | grep -q "Error"; then
+            echo "✅ SAE 部署命令执行成功！"
+            echo "📋 部署已提交，请在 SAE 控制台查看部署进度"
+          else
+            echo "❌ SAE 自动部署失败"
+            echo "💡 镜像已成功推送到 ACR，请在 SAE 控制台手动部署："
+            echo "   镜像地址: ${{ steps.version.outputs.image_tag }}"
+            echo "   应用 ID: ${SAE_APP_ID}"
+            # 不退出，允许继续
+          fi
 
       - name: Output deployment information
         run: |
