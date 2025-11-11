@@ -77,6 +77,14 @@ jobs:
           echo "image_tag=${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.APP_NAME }}:$VERSION" >> $GITHUB_OUTPUT
           echo "image_latest=${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.APP_NAME }}:latest" >> $GITHUB_OUTPUT
 
+      - name: Set up Docker Buildx cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -88,8 +96,8 @@ jobs:
             ${{ steps.version.outputs.image_latest }}
           build-args: |
             NEXT_TELEMETRY_DISABLED=1
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.APP_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.APP_NAME }}:buildcache,mode=max
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
       - name: Output image information
         run: |
