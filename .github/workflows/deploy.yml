@@ -131,36 +131,55 @@ jobs:
             --region ${SAE_REGION}
           
           # 调用 SAE API 部署应用
-          # SAE 使用 ROA 风格 API，需要使用 POST 方法和路径
           echo "🚀 开始部署应用..."
           
+          # 测试 aliyun CLI 是否正常工作
+          echo "🔍 测试 aliyun CLI..."
+          aliyun --version || echo "⚠️  aliyun CLI 版本检查失败"
+          
           # 方法1: 使用 aliyun CLI 的 ROA 调用方式
+          echo "📡 尝试调用 SAE API (方法1: ROA with JSON body)..."
+          set +e  # 临时禁用错误退出
           RESPONSE=$(aliyun sae POST /pop/v1/sam/app/deployApplication \
             --body "{\"AppId\":\"${SAE_APP_ID}\",\"ImageUrl\":\"${{ steps.version.outputs.image_tag }}\"}" \
             --header "Content-Type:application/json" 2>&1)
-          
           EXIT_CODE=$?
+          set -e  # 重新启用错误退出
+          
+          echo "📋 响应 (退出码: ${EXIT_CODE}):"
+          echo "${RESPONSE}"
           
           # 如果失败，尝试使用 query 参数方式
           if [ ${EXIT_CODE} -ne 0 ]; then
-            echo "⚠️  第一次尝试失败，使用备用方式..."
+            echo ""
+            echo "⚠️  方法1失败，尝试方法2 (query parameters)..."
+            set +e
             RESPONSE=$(aliyun sae --method POST \
               --uri /pop/v1/sam/app/deployApplication \
               --body "AppId=${SAE_APP_ID}&ImageUrl=${{ steps.version.outputs.image_tag }}" 2>&1)
             EXIT_CODE=$?
+            set -e
+            
+            echo "📋 响应 (退出码: ${EXIT_CODE}):"
+            echo "${RESPONSE}"
           fi
           
-          echo "${RESPONSE}"
-          
-          if [ ${EXIT_CODE} -eq 0 ] && ! echo "${RESPONSE}" | grep -q "Error"; then
+          # 判断是否成功
+          if [ ${EXIT_CODE} -eq 0 ] && ! echo "${RESPONSE}" | grep -qi "error"; then
+            echo ""
             echo "✅ SAE 部署命令执行成功！"
             echo "📋 部署已提交，请在 SAE 控制台查看部署进度"
           else
-            echo "❌ SAE 自动部署失败"
-            echo "💡 镜像已成功推送到 ACR，请在 SAE 控制台手动部署："
-            echo "   镜像地址: ${{ steps.version.outputs.image_tag }}"
-            echo "   应用 ID: ${SAE_APP_ID}"
-            # 不退出，允许继续
+            echo ""
+            echo "⚠️  SAE 自动部署失败（但不影响镜像推送）"
+            echo ""
+            echo "📦 镜像已成功推送到 ACR，请手动部署："
+            echo "   1. 登录阿里云 SAE 控制台"
+            echo "   2. 选择应用 ID: ${SAE_APP_ID}"
+            echo "   3. 点击 '部署应用'"
+            echo "   4. 选择镜像: ${{ steps.version.outputs.image_tag }}"
+            echo ""
+            # 不退出，镜像推送成功就算成功
           fi
 
       - name: Output deployment information
