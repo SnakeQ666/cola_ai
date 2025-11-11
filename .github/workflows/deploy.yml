@@ -121,6 +121,7 @@ jobs:
           from aliyunsdkcore.request import CommonRequest
           import json
           import os
+          import sys
           
           access_key_id = os.environ['ALIYUN_ACCESS_KEY_ID']
           access_key_secret = os.environ['ALIYUN_ACCESS_KEY_SECRET']
@@ -131,25 +132,7 @@ jobs:
           # 创建客户端
           client = AcsClient(access_key_id, access_key_secret, region)
           
-          # 先更新应用配置
-          print("📝 更新应用配置...")
-          update_request = CommonRequest()
-          update_request.set_accept_format('json')
-          update_request.set_domain('sae.' + region + '.aliyuncs.com')
-          update_request.set_method('PUT')
-          update_request.set_protocol_type('https')
-          update_request.set_version('2019-05-06')
-          update_request.set_action_name('UpdateApplication')
-          update_request.add_body_params('AppId', app_id)
-          update_request.add_body_params('ImageUrl', image_url)
-          
-          try:
-              update_response = client.do_action_with_exception(update_request)
-              print("✅ 应用配置更新成功")
-          except Exception as e:
-              print(f"⚠️  配置更新失败（可能已是最新）: {e}")
-          
-          # 部署应用
+          # 部署应用 - 使用 RPC 风格 API
           print("🚀 开始部署应用...")
           deploy_request = CommonRequest()
           deploy_request.set_accept_format('json')
@@ -158,20 +141,28 @@ jobs:
           deploy_request.set_protocol_type('https')
           deploy_request.set_version('2019-05-06')
           deploy_request.set_action_name('DeployApplication')
-          deploy_request.add_body_params('AppId', app_id)
-          deploy_request.add_body_params('ImageUrl', image_url)
+          
+          # 使用 query_params 而不是 body_params
+          deploy_request.add_query_param('AppId', app_id)
+          deploy_request.add_query_param('ImageUrl', image_url)
           
           try:
               deploy_response = client.do_action_with_exception(deploy_request)
               response_data = json.loads(deploy_response.decode('utf-8'))
-              print("✅ SAE 部署成功！")
-              print(f"🔗 应用 ID: {app_id}")
-              print(f"📦 镜像: {image_url}")
-              if 'Data' in response_data:
-                  print(f"📋 部署 ID: {response_data.get('Data', {}).get('ChangeOrderId', 'N/A')}")
+              
+              if response_data.get('Success', False) or response_data.get('Code') == '200':
+                  print("✅ SAE 部署成功！")
+                  print(f"🔗 应用 ID: {app_id}")
+                  print(f"📦 镜像: {image_url}")
+                  if 'Data' in response_data:
+                      change_order_id = response_data.get('Data', {}).get('ChangeOrderId', 'N/A')
+                      print(f"📋 变更单 ID: {change_order_id}")
+              else:
+                  print(f"❌ SAE 部署失败: {response_data}")
+                  sys.exit(1)
           except Exception as e:
               print(f"❌ SAE 部署失败: {e}")
-              exit(1)
+              sys.exit(1)
           EOF
 
       - name: Output deployment information
