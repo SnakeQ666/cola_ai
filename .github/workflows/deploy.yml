@@ -137,16 +137,17 @@ jobs:
           echo "🔍 测试 aliyun CLI..."
           aliyun --version || echo "⚠️  aliyun CLI 版本检查失败"
           
-          # 方法1: 使用 aliyun CLI 的 ROA 调用方式
-          echo "📡 尝试调用 SAE API (方法1: ROA with JSON body)..."
+          # 使用 aliyun CLI 调用 SAE API
+          # 根据官方文档，使用 POST 方法和路径模式
+          echo "📡 调用 SAE API..."
           set +e  # 临时禁用错误退出
           RESPONSE=$(aliyun sae POST /pop/v1/sam/app/deployApplication \
-            --body "{\"AppId\":\"${SAE_APP_ID}\",\"ImageUrl\":\"${{ steps.version.outputs.image_tag }}\"}" \
-            --header "Content-Type:application/json" 2>&1)
+            --header "Content-Type=application/json" \
+            --body "{\"AppId\":\"${SAE_APP_ID}\",\"ImageUrl\":\"${{ steps.version.outputs.image_tag }}\"}" 2>&1)
           EXIT_CODE=$?
           set -e  # 重新启用错误退出
           
-          echo "📋 响应 (退出码: ${EXIT_CODE}):"
+          echo "📋 API 响应 (退出码: ${EXIT_CODE}):"
           echo "${RESPONSE}"
           
           # 如果失败，尝试使用 query 参数方式
