@@ -138,32 +138,21 @@ jobs:
           aliyun --version || echo "⚠️  aliyun CLI 版本检查失败"
           
           # 使用 aliyun CLI 调用 SAE API
-          # 根据官方文档，使用 POST 方法和路径模式
+          # SAE API 需要使用 URL 编码的参数
           echo "📡 调用 SAE API..."
           set +e  # 临时禁用错误退出
+          
+          # URL 编码镜像地址（替换特殊字符）
+          IMAGE_URL_ENCODED=$(echo "${{ steps.version.outputs.image_tag }}" | sed 's/:/%3A/g' | sed 's/\//%2F/g')
+          
+          # 使用 POST 方法，参数通过 --body 传递
           RESPONSE=$(aliyun sae POST /pop/v1/sam/app/deployApplication \
-            --header "Content-Type=application/json" \
-            --body "{\"AppId\":\"${SAE_APP_ID}\",\"ImageUrl\":\"${{ steps.version.outputs.image_tag }}\"}" 2>&1)
+            --body "AppId=${SAE_APP_ID}&ImageUrl=${IMAGE_URL_ENCODED}" 2>&1)
           EXIT_CODE=$?
           set -e  # 重新启用错误退出
           
           echo "📋 API 响应 (退出码: ${EXIT_CODE}):"
           echo "${RESPONSE}"
-          
-          # 如果失败，尝试使用 query 参数方式
-          if [ ${EXIT_CODE} -ne 0 ]; then
-            echo ""
-            echo "⚠️  方法1失败，尝试方法2 (query parameters)..."
-            set +e
-            RESPONSE=$(aliyun sae --method POST \
-              --uri /pop/v1/sam/app/deployApplication \
-              --body "AppId=${SAE_APP_ID}&ImageUrl=${{ steps.version.outputs.image_tag }}" 2>&1)
-            EXIT_CODE=$?
-            set -e
-            
-            echo "📋 响应 (退出码: ${EXIT_CODE}):"
-            echo "${RESPONSE}"
-          fi
           
           # 判断是否成功
           if [ ${EXIT_CODE} -eq 0 ] && ! echo "${RESPONSE}" | grep -qi "error"; then
