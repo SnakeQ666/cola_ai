@@ -138,37 +138,63 @@ jobs:
           aliyun --version || echo "⚠️  aliyun CLI 版本检查失败"
           
           # 使用 aliyun CLI 调用 SAE API
-          # SAE API 需要使用 URL 编码的参数
-          echo "📡 调用 SAE API..."
+          # 根据 SAE API 文档，使用命令行参数方式
+          echo "📡 调用 SAE API (DeployApplication)..."
+          echo "🔗 应用 ID: ${SAE_APP_ID}"
+          echo "📦 镜像地址: ${{ steps.version.outputs.image_tag }}"
+          
           set +e  # 临时禁用错误退出
           
-          # URL 编码镜像地址（替换特殊字符）
-          IMAGE_URL_ENCODED=$(echo "${{ steps.version.outputs.image_tag }}" | sed 's/:/%3A/g' | sed 's/\//%2F/g')
-          
-          # 使用 POST 方法，参数通过 --body 传递
-          RESPONSE=$(aliyun sae POST /pop/v1/sam/app/deployApplication \
-            --body "AppId=${SAE_APP_ID}&ImageUrl=${IMAGE_URL_ENCODED}" 2>&1)
+          # 方法1: 使用命令行参数（推荐方式）
+          RESPONSE=$(aliyun sae DeployApplication \
+            --AppId "${SAE_APP_ID}" \
+            --ImageUrl "${{ steps.version.outputs.image_tag }}" \
+            --RegionId "${SAE_REGION}" 2>&1)
           EXIT_CODE=$?
-          set -e  # 重新启用错误退出
           
           echo "📋 API 响应 (退出码: ${EXIT_CODE}):"
           echo "${RESPONSE}"
           
+          # 如果失败，尝试使用 ROA 风格调用
+          if [ ${EXIT_CODE} -ne 0 ] && echo "${RESPONSE}" | grep -q "MissingAppId"; then
+            echo ""
+            echo "⚠️  尝试使用 ROA 风格调用..."
+            
+            # URL 编码镜像地址
+            IMAGE_URL_ENCODED=$(echo "${{ steps.version.outputs.image_tag }}" | sed 's/:/%3A/g' | sed 's/\//%2F/g')
+            
+            RESPONSE=$(aliyun sae POST /pop/v1/sam/app/deployApplication \
+              --body "AppId=${SAE_APP_ID}&ImageUrl=${IMAGE_URL_ENCODED}&RegionId=${SAE_REGION}" 2>&1)
+            EXIT_CODE=$?
+            
+            echo "📋 ROA 响应 (退出码: ${EXIT_CODE}):"
+            echo "${RESPONSE}"
+          fi
+          
+          set -e  # 重新启用错误退出
+          
           # 判断是否成功
-          if [ ${EXIT_CODE} -eq 0 ] && ! echo "${RESPONSE}" | grep -qi "error"; then
+          # 检查退出码和响应内容中是否包含错误信息
+          if [ ${EXIT_CODE} -eq 0 ] && \
+             ! echo "${RESPONSE}" | grep -qi "error" && \
+             ! echo "${RESPONSE}" | grep -qi "missing" && \
+             ! echo "${RESPONSE}" | grep -qi "invalid" && \
+             echo "${RESPONSE}" | grep -qi "success\|data\|changeid"; then
             echo ""
             echo "✅ SAE 部署命令执行成功！"
             echo "📋 部署已提交，请在 SAE 控制台查看部署进度"
           else
             echo ""
-            echo "⚠️  SAE 自动部署失败（但不影响镜像推送）"
+            echo "❌ SAE 自动部署失败"
+            echo "📋 退出码: ${EXIT_CODE}"
             echo ""
-            echo "📦 镜像已成功推送到 ACR，请手动部署："
-            echo "   1. 登录阿里云 SAE 控制台"
+            echo "💡 镜像已成功推送到 ACR，请手动部署："
+            echo "   1. 登录阿里云 SAE 控制台: https://sae.console.aliyun.com"
             echo "   2. 选择应用 ID: ${SAE_APP_ID}"
             echo "   3. 点击 '部署应用'"
             echo "   4. 选择镜像: ${{ steps.version.outputs.image_tag }}"
             echo ""
+            echo "⚠️  注意: 此错误不会影响镜像推送，镜像已在 ACR 中"
             # 不退出，镜像推送成功就算成功
           fi
 
