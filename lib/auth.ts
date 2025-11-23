@@ -6,6 +6,7 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
+import { getServerSession } from 'next-auth'
 import { db } from '@/lib/db'
 
 export const authOptions: NextAuthOptions = {
@@ -78,3 +79,28 @@ export const authOptions: NextAuthOptions = {
   },
 }
 
+/**
+ * 获取当前登录用户
+ * 用于 API 路由中验证用户身份
+ */
+export async function getCurrentUser() {
+  const session = await getServerSession(authOptions)
+  
+  if (!session?.user?.email) {
+    return null
+  }
+  
+  const user = await db.user.findUnique({
+    where: {
+      email: session.user.email
+    },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      avatar: true
+    }
+  })
+  
+  return user
+}

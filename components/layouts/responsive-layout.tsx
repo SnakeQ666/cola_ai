@@ -14,12 +14,11 @@ import {
   Menu,
   X,
   Home,
-  Database,
-  MessageSquare,
-  BarChart3,
   Settings,
   User,
   Brain,
+  TrendingUp,
+  Zap,
 } from 'lucide-react'
 
 interface ResponsiveLayoutProps {
@@ -27,10 +26,9 @@ interface ResponsiveLayoutProps {
 }
 
 const navigation = [
-  { name: '工作台', href: '/dashboard', icon: Home },
-  { name: '数据集', href: '/datasets', icon: Database },
-  { name: 'AI分析', href: '/analysis', icon: MessageSquare },
-  { name: '可视化', href: '/visualizations', icon: BarChart3 },
+  { name: '首页', href: '/', icon: Home },
+  { name: 'AI现货交易', href: '/trading', icon: TrendingUp },
+  { name: 'AI合约交易', href: '/futures', icon: Zap },
   { name: '设置', href: '/settings', icon: Settings },
 ]
 
@@ -43,9 +41,9 @@ export function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
       {/* 顶部导航栏 - 移动端 */}
       <header className="lg:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-14 items-center justify-between px-4">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <Brain className="h-6 w-6 text-primary" />
-            <span className="font-semibold">AI分析</span>
+            <span className="font-semibold">AI交易</span>
           </Link>
           
           <Button
@@ -107,7 +105,7 @@ export function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 border-r bg-background">
           <div className="flex items-center gap-2 h-16 px-6 border-b">
             <Brain className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">AI数据分析</span>
+            <span className="text-xl font-bold">AI交易平台</span>
           </div>
           
           <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
@@ -154,8 +152,8 @@ export function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
 
       {/* 移动端底部导航 */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-background">
-        <div className="grid grid-cols-5 gap-1 p-2">
-          {navigation.slice(0, 5).map((item) => {
+        <div className="grid grid-cols-4 gap-1 p-2">
+          {navigation.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             
@@ -171,7 +169,7 @@ export function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
                 )}
               >
                 <Icon className="h-5 w-5" />
-                <span>{item.name}</span>
+                <span className="truncate">{item.name}</span>
               </Link>
             )
           })}

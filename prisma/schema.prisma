@@ -22,11 +22,10 @@ model User {
   updatedAt     DateTime  @updatedAt
   
   // 关联
-  datasets      Dataset[]
-  analyses      Analysis[]
-  visualizations Visualization[]
   accounts      Account[]
   sessions      Session[]
+  binanceAccount BinanceAccount?
+  futuresAccount FuturesAccount?
   
   @@map("users")
 }
@@ -71,98 +70,303 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// 数据集表
-model Dataset {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  fileUrl     String   // OSS存储路径
-  fileSize    Int      // 文件大小（字节）
-  fileType    String   // csv, excel, json
-  rowCount    Int?     // 数据行数
-  columnCount Int?     // 列数
-  columns     Json?    // 列信息
-  status      String   @default("processing") // processing, ready, error
-  
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // 关联
-  analyses    Analysis[]
-  visualizations Visualization[]
-  
-  @@map("datasets")
-  @@index([userId])
-}
+// ==================== AI 交易系统表 ====================
 
-// AI分析会话表
-model Analysis {
+// Binance 账户配置
+model BinanceAccount {
   id              String   @id @default(cuid())
-  title           String
-  conversationId  String?  // Dify对话ID
-  status          String   @default("active") // active, archived
-  
-  datasetId       String?
-  dataset         Dataset? @relation(fields: [datasetId], references: [id], onDelete: SetNull)
-  
-  userId          String
+  userId          String   @unique
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // API 凭证（加密存储）
+  apiKey          String   // AES-256 加密
+  apiSecret       String   // AES-256 加密
+  isTestnet       Boolean  @default(true) // 默认测试网
+  
+  // 风控配置
+  enableAutoTrade Boolean  @default(false) // 是否启用自动交易
+  tradeInterval   Int      @default(5) // AI 交易间隔（分钟）
+  maxTradeAmount  Decimal  @default(100) @db.Decimal(10, 2) // 单笔最大交易金额（USDT）
+  maxDailyLoss    Decimal  @default(50) @db.Decimal(10, 2)  // 单日最大亏损限额
+  allowedSymbols  String[] @default(["BTCUSDT", "ETHUSDT"]) // 允许交易的币种白名单
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
   // 关联
-  messages        Message[]
-  visualizations  Visualization[]
+  trades          Trade[]
+  balanceHistory  BalanceHistory[]
+  aiDecisions     AIDecision[]
   
-  @@map("analyses")
+  @@map("binance_accounts")
   @@index([userId])
-  @@index([datasetId])
 }
 
-// 对话消息表
-model Message {
-  id          String   @id @default(cuid())
-  role        String   // user, assistant
-  content     String   @db.Text
-  metadata    Json?    // 额外信息
+// 交易记录
+model Trade {
+  id              String   @id @default(cuid())
+  accountId       String
+  account         BinanceAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   
-  analysisId  String
-  analysis    Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  // 交易信息
+  orderId         String   @unique // Binance订单ID
+  symbol          String   // 交易对，如 BTCUSDT
+  side            String   // BUY / SELL
+  type            String   // MARKET / LIMIT
+  price           Decimal  @db.Decimal(20, 8) // 成交价格
+  quantity        Decimal  @db.Decimal(20, 8) // 数量
+  quoteQty        Decimal  @db.Decimal(20, 8) // 交易金额（USDT）
+  commission      Decimal  @db.Decimal(20, 8) // 手续费
+  status          String   // FILLED / PARTIALLY_FILLED / CANCELLED
   
-  createdAt   DateTime @default(now())
+  // AI 决策信息
+  aiDecisionId    String?
+  aiDecision      AIDecision? @relation(fields: [aiDecisionId], references: [id])
+  aiReasoning     String?  @db.Text // AI的决策理由
   
-  @@map("messages")
-  @@index([analysisId])
+  // 收益信息
+  realizedPnl     Decimal? @db.Decimal(20, 8) // 已实现盈亏
+  
+  executedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  
+  @@map("trades")
+  @@index([accountId])
+  @@index([symbol])
+  @@index([executedAt])
+  @@index([aiDecisionId])
 }
 
-// 可视化看板表
-model Visualization {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  chartType   String   // line, bar, pie, scatter, etc.
-  config      Json     // ECharts配置
-  data        Json?    // 图表数据（可选）
+// AI 决策记录
+model AIDecision {
+  id              String   @id @default(cuid())
+  accountId       String
+  account         BinanceAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   
-  datasetId   String?
-  dataset     Dataset? @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  // 决策上下文
+  marketData      Json     // 市场数据快照
+  accountBalance  Json     // 账户余额快照
+  technicalIndicators Json? // 技术指标
   
-  analysisId  String?
-  analysis    Analysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  // AI 思考过程
+  reasoning       String   @db.Text // 分析过程
+  confidence      Decimal  @db.Decimal(3, 2) // 信心指数 0-1
+  riskLevel       String   // LOW / MEDIUM / HIGH
   
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 决策结果
+  action          String   // BUY / SELL / HOLD
+  symbol          String?
+  targetPrice     Decimal? @db.Decimal(20, 8)
+  targetQuantity  Decimal? @db.Decimal(20, 8)
   
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // 执行结果
+  executed        Boolean  @default(false)
+  executedAt      DateTime?
+  outcome         String?  // SUCCESS / FAILED / CANCELLED
   
-  @@map("visualizations")
+  createdAt       DateTime @default(now())
+  
+  // 关联
+  trades          Trade[]
+  
+  @@map("ai_decisions")
+  @@index([accountId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+// 余额历史
+model BalanceHistory {
+  id              String   @id @default(cuid())
+  accountId       String
+  account         BinanceAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  // 余额快照
+  balances        Json     // { "BTC": 0.5, "USDT": 10000, "ETH": 2.5 }
+  totalValueUSDT  Decimal  @db.Decimal(20, 2) // 总价值（USDT计价）
+  
+  // 收益统计
+  dailyPnl        Decimal? @db.Decimal(20, 2) // 日收益
+  totalPnl        Decimal? @db.Decimal(20, 2) // 总收益
+  
+  snapshotAt      DateTime @default(now())
+  
+  @@map("balance_history")
+  @@index([accountId])
+  @@index([snapshotAt])
+}
+
+// ==================== AI 合约交易系统表 ====================
+
+// 合约账户配置（扩展 Binance 账户）
+model FuturesAccount {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 合约配置
+  enableAutoTrade Boolean  @default(false) // 是否启用自动交易
+  tradeInterval   Int      @default(5) // AI 交易间隔（分钟）
+  defaultLeverage Int      @default(10) // 默认杠杆倍数 1-125
+  maxLeverage     Int      @default(20) // 最大杠杆倍数
+  maxPositionSize Decimal  @default(1000) @db.Decimal(10, 2) // 单仓位最大金额（USDT）
+  maxDailyLoss    Decimal  @default(100) @db.Decimal(10, 2)  // 单日最大亏损限额
+  allowedSymbols  String[] @default(["BTCUSDT", "ETHUSDT"]) // 允许交易的合约
+  
+  // 风控配置
+  stopLossPercent Decimal  @default(5) @db.Decimal(5, 2) // 止损百分比
+  takeProfitPercent Decimal @default(10) @db.Decimal(5, 2) // 止盈百分比
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // 关联
+  positions       FuturesPosition[]
+  orders          FuturesOrder[]
+  aiDecisions     FuturesAIDecision[]
+  balanceHistory  FuturesBalanceHistory[]
+  
+  @@map("futures_accounts")
   @@index([userId])
-  @@index([datasetId])
-  @@index([analysisId])
+}
+
+// 合约持仓
+model FuturesPosition {
+  id              String   @id @default(cuid())
+  accountId       String
+  account         FuturesAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  // 持仓信息
+  symbol          String   // 交易对，如 BTCUSDT
+  side            String   // LONG / SHORT
+  leverage        Int      // 杠杆倍数
+  entryPrice      Decimal  @db.Decimal(20, 8) // 开仓均价
+  quantity        Decimal  @db.Decimal(20, 8) // 持仓数量
+  margin          Decimal  @db.Decimal(20, 8) // 保证金
+  
+  // 当前状态
+  markPrice       Decimal? @db.Decimal(20, 8) // 标记价格
+  liquidationPrice Decimal? @db.Decimal(20, 8) // 强平价格
+  unrealizedPnl   Decimal? @db.Decimal(20, 8) // 未实现盈亏
+  roe             Decimal? @db.Decimal(10, 4) // 回报率 (%)
+  
+  // AI 决策信息
+  aiDecisionId    String?
+  aiDecision      FuturesAIDecision? @relation(fields: [aiDecisionId], references: [id])
+  
+  // 状态
+  status          String   @default("OPEN") // OPEN / CLOSED
+  closedAt        DateTime?
+  realizedPnl     Decimal? @db.Decimal(20, 8) // 已实现盈亏
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("futures_positions")
+  @@index([accountId])
+  @@index([symbol])
+  @@index([status])
+  @@index([aiDecisionId])
+}
+
+// 合约订单
+model FuturesOrder {
+  id              String   @id @default(cuid())
+  accountId       String
+  account         FuturesAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  // 订单信息
+  orderId         String   @unique // Binance订单ID
+  symbol          String   // 交易对
+  side            String   // BUY / SELL
+  positionSide    String   // LONG / SHORT / BOTH
+  type            String   // MARKET / LIMIT / STOP_MARKET
+  price           Decimal? @db.Decimal(20, 8) // 委托价格
+  quantity        Decimal  @db.Decimal(20, 8) // 数量
+  executedQty     Decimal  @db.Decimal(20, 8) // 成交数量
+  avgPrice        Decimal? @db.Decimal(20, 8) // 成交均价
+  
+  // 状态
+  status          String   // NEW / FILLED / CANCELED / EXPIRED
+  
+  // AI 决策信息
+  aiDecisionId    String?
+  aiDecision      FuturesAIDecision? @relation(fields: [aiDecisionId], references: [id])
+  
+  executedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  
+  @@map("futures_orders")
+  @@index([accountId])
+  @@index([symbol])
+  @@index([status])
+  @@index([aiDecisionId])
+}
+
+// AI 合约决策记录
+model FuturesAIDecision {
+  id              String   @id @default(cuid())
+  accountId       String
+  account         FuturesAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  // 决策上下文
+  marketData      Json     // 市场数据快照
+  accountBalance  Json     // 账户余额快照
+  currentPositions Json?   // 当前持仓快照
+  technicalIndicators Json? // 技术指标
+  
+  // AI 思考过程
+  reasoning       String   @db.Text // 分析过程
+  confidence      Decimal  @db.Decimal(3, 2) // 信心指数 0-1
+  riskLevel       String   // LOW / MEDIUM / HIGH
+  
+  // 决策结果
+  action          String   // OPEN_LONG / OPEN_SHORT / CLOSE_LONG / CLOSE_SHORT / HOLD
+  symbol          String?
+  suggestedLeverage Int?   // 建议杠杆倍数
+  suggestedMargin Decimal? @db.Decimal(20, 8) // 建议保证金
+  targetPrice     Decimal? @db.Decimal(20, 8) // 目标价格
+  stopLoss        Decimal? @db.Decimal(20, 8) // 止损价格
+  takeProfit      Decimal? @db.Decimal(20, 8) // 止盈价格
+  
+  // 执行结果
+  executed        Boolean  @default(false)
+  executedAt      DateTime?
+  outcome         String?  // SUCCESS / FAILED / CANCELLED
+  
+  createdAt       DateTime @default(now())
+  
+  // 关联
+  positions       FuturesPosition[]
+  orders          FuturesOrder[]
+  
+  @@map("futures_ai_decisions")
+  @@index([accountId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+// 合约余额历史
+model FuturesBalanceHistory {
+  id              String   @id @default(cuid())
+  accountId       String
+  account         FuturesAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  // 余额快照
+  totalBalance    Decimal  @db.Decimal(20, 8) // 总余额
+  availableBalance Decimal @db.Decimal(20, 8) // 可用余额
+  usedMargin      Decimal  @db.Decimal(20, 8) // 已用保证金
+  unrealizedPnl   Decimal  @db.Decimal(20, 8) // 未实现盈亏
+  totalValueUSDT  Decimal  @db.Decimal(20, 2) // 总价值（USDT计价）
+  
+  // 收益统计
+  dailyPnl        Decimal? @db.Decimal(20, 2) // 日收益
+  totalPnl        Decimal? @db.Decimal(20, 2) // 总收益
+  
+  snapshotAt      DateTime @default(now())
+  
+  @@map("futures_balance_history")
+  @@index([accountId])
+  @@index([snapshotAt])
 }
 
