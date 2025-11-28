@@ -44,7 +44,6 @@ export async function GET() {
       user: userData,
     })
   } catch (error: any) {
-    console.error('获取用户信息失败:', error)
     return NextResponse.json(
       { error: '获取用户信息失败' },
       { status: 500 }
@@ -98,7 +97,6 @@ export async function PATCH(req: Request) {
       user: updatedUser,
     })
   } catch (error: any) {
-    console.error('更新用户信息失败:', error)
     return NextResponse.json(
       { error: error.message || '更新用户信息失败' },
       { status: 500 }

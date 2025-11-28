@@ -137,7 +137,6 @@ export default function RegisterPage() {
       router.push('/trading');
       router.refresh();
     } catch (error) {
-      console.error('注册失败:', error);
       setError('注册失败，请稍后重试');
       setLoading(false);
     }

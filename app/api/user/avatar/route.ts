@@ -48,7 +48,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, url, key, user: updated })
   } catch (error: any) {
-    console.error('上传头像失败:', error)
     return NextResponse.json({ error: error.message || '上传头像失败' }, { status: 500 })
   }
 }

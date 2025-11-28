@@ -11,20 +11,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  console.log('[Cron] 开始执行 AI 交易任务');
-
   const accounts = await db.binanceAccount.findMany({
     where: { enableAutoTrade: true },
     include: { user: true }
   });
 
-  console.log(`[Cron] 找到 ${accounts.length} 个启用自动交易的账户`);
-
   const results = await Promise.allSettled(
     accounts.map(async (account) => {
       try {
-        console.log(`[Cron] 处理用户 ${account.userId}`);
-        
         const result = await runAITradingDecision(account.userId);
         
         if (!result) {
@@ -114,8 +108,6 @@ export async function GET(request: NextRequest) {
         const currentPrice = await getCurrentPrice(client, symbol);
         let quantity = aiTradeAmount / currentPrice;
         
-        console.log(`[Cron] 用户 ${account.userId}: AI 建议 $${aiTradeAmount}, 计算数量 ${quantity} ${symbol}`);
-
         const order = await placeMarketOrder(
           client,
           symbol,
@@ -156,7 +148,6 @@ export async function GET(request: NextRequest) {
           trade: trade.id 
         };
       } catch (error: any) {
-        console.error(`[Cron] 处理用户 ${account.userId} 失败:`, error);
         return { 
           userId: account.userId, 
           status: 'error', 
@@ -174,8 +165,6 @@ export async function GET(request: NextRequest) {
     failed: results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && (r.value as any).status === 'error')).length,
     results: results.map(r => r.status === 'fulfilled' ? r.value : { status: 'error', error: 'Promise rejected' })
   };
-
-  console.log('[Cron] 执行完成', summary);
 
   return NextResponse.json(summary);
 }

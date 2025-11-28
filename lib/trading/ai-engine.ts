@@ -48,13 +48,10 @@ const SYSTEM_PROMPT = `你是专业的加密货币交易AI，负责分析市场�
 - 避免在震荡市频繁交易`;
 
 export async function runAITradingDecision(userId: string) {
-  console.log(`[AI Trading] 开始决策，用户: ${userId}`);
-  
   try {
     const { client, account } = await getUserBinanceClient(userId);
     
     if (!account.enableAutoTrade) {
-      console.log('[AI Trading] 自动交易未启用');
       return null;
     }
     
@@ -84,21 +81,19 @@ export async function runAITradingDecision(userId: string) {
           klines: klines.slice(-5)
         };
       } catch (error) {
-        console.error(`[AI Trading] 获取 ${symbol} 数据失败:`, error);
       }
     }
     
-    // 获取 AI 当前持仓
-    const aiTrades = await db.trade.findMany({
+    // 获取账户所有交易记录（手动 + AI），用于还原真实持仓
+    const allTrades = await db.trade.findMany({
       where: {
-        accountId: account.id,
-        aiDecisionId: { not: null }
+        accountId: account.id
       },
       orderBy: { executedAt: 'asc' }
     });
     
     const aiHoldings: { [key: string]: number } = {};
-    for (const trade of aiTrades) {
+    for (const trade of allTrades) {
       const asset = trade.symbol.replace('USDT', '');
       const quantity = parseFloat(trade.quantity.toString());
       
@@ -109,13 +104,13 @@ export async function runAITradingDecision(userId: string) {
       }
     }
     
+    
     // 构建持仓信息和盈亏
     let holdingsInfo = '无持仓';
     const holdingsWithValue: any[] = [];
     const dustHoldings: any[] = []; // 低于最小交易额的持仓（灰尘）
     let totalPnL = 0;
     const MIN_TRADE_VALUE = 5; // Binance 最小交易金额 $5 USDT
-    
     if (Object.keys(aiHoldings).length > 0) {
       for (const [asset, qty] of Object.entries(aiHoldings)) {
         if (qty > 0) {
@@ -128,7 +123,7 @@ export async function runAITradingDecision(userId: string) {
           let totalCost = 0;
           let totalBought = 0;
           
-          for (const trade of aiTrades) {
+          for (const trade of allTrades) {
             if (trade.symbol === assetSymbol) {
               const tradeQty = parseFloat(trade.quantity.toString());
               const tradeCost = parseFloat(trade.quoteQty.toString());
@@ -138,7 +133,7 @@ export async function runAITradingDecision(userId: string) {
                 totalBought += tradeQty;
               } else if (trade.side === 'SELL') {
                 // 卖出时按比例减少成本
-                const soldRatio = tradeQty / totalBought;
+                const soldRatio = totalBought > 0 ? tradeQty / totalBought : 0;
                 totalCost -= totalCost * soldRatio;
                 totalBought -= tradeQty;
               }
@@ -167,6 +162,7 @@ export async function runAITradingDecision(userId: string) {
           }
         }
       }
+     
       
       if (holdingsWithValue.length > 0 || dustHoldings.length > 0) {
         let infoLines: string[] = [];
@@ -175,8 +171,8 @@ export async function runAITradingDecision(userId: string) {
         if (holdingsWithValue.length > 0) {
           infoLines.push('【可交易持仓】');
           holdingsWithValue.forEach(h => {
-            const pnlSign = h.pnl >= 0 ? '+' : '';
-            infoLines.push(`${h.asset}: ${h.quantity.toFixed(6)} (成本 $${h.cost.toFixed(2)}, 现价 $${h.value.toFixed(2)}, 盈亏 ${pnlSign}$${h.pnl.toFixed(2)} / ${pnlSign}${h.pnlPercent.toFixed(2)}%)`);
+          const pnlSign = h.pnl >= 0 ? '+' : '';
+          infoLines.push(`${h.asset}: ${h.quantity.toFixed(6)} (成本 $${h.cost.toFixed(2)}, 现价 $${h.value.toFixed(2)}, 盈亏 ${pnlSign}$${h.pnl.toFixed(2)} / ${pnlSign}${h.pnlPercent.toFixed(2)}%)`);
           });
         }
         
@@ -185,8 +181,8 @@ export async function runAITradingDecision(userId: string) {
           if (infoLines.length > 0) infoLines.push('');
           infoLines.push('【灰尘持仓（价值低于 $5，暂不可交易）】');
           dustHoldings.forEach(h => {
-            const pnlSign = h.pnl >= 0 ? '+' : '';
-            infoLines.push(`${h.asset}: ${h.quantity.toFixed(6)} (价值 $${h.value.toFixed(2)}, 盈亏 ${pnlSign}$${h.pnl.toFixed(2)})`);
+          const pnlSign = h.pnl >= 0 ? '+' : '';
+          infoLines.push(`${h.asset}: ${h.quantity.toFixed(6)} (价值 $${h.value.toFixed(2)}, 盈亏 ${pnlSign}$${h.pnl.toFixed(2)})`);
           });
         }
         
@@ -224,17 +220,19 @@ ${totalPnL !== 0 ? `总盈亏: ${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)
 
 请按照系统提示的格式输出，特别注意：
 1. **必须明确给出"交易币种"（如 BTCUSDT）**
-2. 必须明确给出"交易金额"（单位USDT）
-3. **买入时**，交易金额不能超过 $${account.maxTradeAmount}
-4. **卖出时**，只能卖出"可交易持仓"中的币种，**禁止卖出"灰尘持仓"**（价值低于$5无法交易）
-5. 根据市场信心和风险等级合理分配金额
-6. 如果建议HOLD，交易金额填0
-7. **根据盈亏状况做决策：**
+2. **必须明确给出"交易金额"（单位USDT）**
+   - **买入时**：交易金额不能超过 $${account.maxTradeAmount}
+   - **卖出时**：交易金额为要卖出的币种的价值（如持有 0.001 BTC，当前价 $87000，则交易金额为 $87）
+3. **卖出时**，只能卖出"可交易持仓"中的币种，**禁止卖出"灰尘持仓"**（价值低于$5无法交易）
+4. 根据市场信心和风险等级合理分配金额
+5. 如果建议HOLD，交易金额填0
+6. **根据盈亏状况做决策：**
    - 盈利 > 5%：考虑获利了结
    - 亏损 > 5%：考虑止损或等待反弹
    - 亏损 > 10%：强烈建议止损
-8. **分析所有币种，选择最优机会进行交易**
-9. **灰尘持仓无法交易，忽略即可，只关注可交易持仓**`;
+7. **分析所有币种，选择最优机会进行交易**
+8. **灰尘持仓无法交易，忽略即可，只关注可交易持仓**
+9. **卖出时可以部分卖出或全部卖出，根据市场情况决定**`;
 
     const response = await deepseek.chat.completions.create({
       model: 'deepseek-chat',
@@ -247,7 +245,6 @@ ${totalPnL !== 0 ? `总盈亏: ${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)
     });
     
     const reasoning = response.choices[0].message.content || '';
-    console.log('[AI Trading] AI 分析完成，tokens:', response.usage?.total_tokens);
     const decision = parseAIDecision(reasoning);
     
     // 使用 AI 选择的币种，如果没有则使用第一个
@@ -280,11 +277,9 @@ ${totalPnL !== 0 ? `总盈亏: ${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)
       }
     });
     
-    console.log(`[AI Trading] 决策完成: ${decision.action} ${selectedSymbol}, 信心: ${decision.confidence}`);
     
     return { decision, reasoning, aiDecision };
   } catch (error: any) {
-    console.error('[AI Trading] 决策失败:', error);
     throw error;
   }
 }

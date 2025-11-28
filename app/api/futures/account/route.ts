@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ account });
   } catch (error: any) {
-    console.error('[API] 获取合约账户失败:', error);
     return NextResponse.json(
       { error: error.message || '获取合约账户失败' },
       { status: 500 }
@@ -72,9 +71,7 @@ export async function POST(request: NextRequest) {
     try {
       const { client } = await getUserBinanceFuturesClient(user.id);
       await setPositionMode(client, true); // true = 双向持仓模式
-      console.log('[API] 合约账户已设置为双向持仓模式');
     } catch (error: any) {
-      console.error('[API] 设置持仓模式失败:', error);
       // 如果已经是双向持仓模式，会报错，但可以忽略
       if (!error.message.includes('No need to change position side')) {
         console.warn('[API] 持仓模式设置警告:', error.message);
@@ -83,7 +80,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ account });
   } catch (error: any) {
-    console.error('[API] 创建合约账户失败:', error);
     return NextResponse.json(
       { error: error.message || '创建合约账户失败' },
       { status: 500 }
@@ -130,7 +126,6 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ account });
   } catch (error: any) {
-    console.error('[API] 更新合约账户失败:', error);
     return NextResponse.json(
       { error: error.message || '更新合约账户失败' },
       { status: 500 }

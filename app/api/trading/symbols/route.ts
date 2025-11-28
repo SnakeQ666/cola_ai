@@ -32,7 +32,6 @@ export async function GET(request: NextRequest) {
       symbols: usdtPairs
     });
   } catch (error: any) {
-    console.error('[API] 获取交易对失败:', error);
     return NextResponse.json(
       { error: '获取交易对失败: ' + error.message },
       { status: 500 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { runFuturesAIDecision } from '@/lib/trading/futures-ai-engine';
-import { getUserBinanceFuturesClient, placeFuturesMarketOrder, setLeverage, getFuturesMarkPrice, getFuturesSymbolInfo, adjustFuturesQuantity, getFuturesAccountBalance } from '@/lib/binance-futures';
+import { getUserBinanceFuturesClient, placeFuturesMarketOrder, setLeverage, getFuturesMarkPrice, getFuturesSymbolInfo, adjustFuturesQuantity, getFuturesAccountInfo } from '@/lib/binance-futures';
 import { db } from '@/lib/db';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 检查信心指数
-    if (decision.confidence < 0.7) {
+    // 检查信心指数（合约交易：65% 以上即可执行）
+    if (decision.confidence < 0.65) {
       await db.futuresAIDecision.update({
         where: { id: aiDecision.id },
         data: { 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         reasoning: result.reasoning,
         decisionId: result.aiDecision.id,
         executed: false,
-        reason: `信心指数过低 (${(decision.confidence * 100).toFixed(0)}%)，已取消交易`
+        reason: `信心指数过低 (${(decision.confidence * 100).toFixed(0)}%)，已取消交易（需要 ≥65%）`
       });
     }
 
@@ -225,8 +225,6 @@ export async function POST(request: NextRequest) {
         throw new Error(`未知的交易动作: ${decision.action}`);
       }
 
-      console.log(`[Futures] 执行交易: ${decision.action} ${symbol} ${quantity} @ ${leverage}x`);
-
       // 下单
       const order = await placeFuturesMarketOrder(
         client,
@@ -236,35 +234,117 @@ export async function POST(request: NextRequest) {
         positionSide
       );
 
-      // 记录订单
-      const futuresOrder = await db.futuresOrder.create({
-        data: {
-          accountId: futuresAccount.id,
-          orderId: order.orderId.toString(),
-          symbol,
-          side,
-          positionSide,
-          type: 'MARKET',
-          quantity: new Decimal(quantity),
-          executedQty: new Decimal(order.executedQty || quantity),
-          avgPrice: new Decimal(order.avgPrice || markPrice),
-          status: order.status || 'FILLED',
-          aiDecisionId: aiDecision.id
+      // 使用我们自己计算的值，因为 Binance 可能不返回 avgPrice 和 executedQty
+      const executedQty = order.executedQty || order.cumQty || order.origQty || quantity;
+      const avgPrice = order.avgPrice || markPrice;  // 市价单使用标记价格
+
+      // 如果是平仓，计算盈亏
+      let orderPnl: number | null = null;
+      
+      if (decision.action === 'CLOSE_LONG' || decision.action === 'CLOSE_SHORT') {
+        // 查找对应的持仓记录
+        const position = await db.futuresPosition.findFirst({
+          where: {
+            accountId: futuresAccount.id,
+            symbol,
+            side: positionSide,
+            status: 'OPEN'
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+        
+        if (position) {
+          const entryPrice = parseFloat(position.entryPrice.toString());
+          const closePrice = parseFloat(avgPrice.toString());
+          const qty = parseFloat(executedQty.toString());
+          
+          // 计算盈亏
+          if (positionSide === 'LONG') {
+            // 多单盈亏 = (平仓价 - 开仓价) × 数量
+            orderPnl = (closePrice - entryPrice) * qty;
+          } else {
+            // 空单盈亏 = (开仓价 - 平仓价) × 数量
+            orderPnl = (entryPrice - closePrice) * qty;
+          }
+          
+          // 更新持仓状态为已关闭
+          await db.futuresPosition.update({
+            where: { id: position.id },
+            data: {
+              status: 'CLOSED',
+              closedAt: new Date(),
+              realizedPnl: new Decimal(orderPnl)
+            }
+          });
+        } else {
+          console.warn(`[Futures Analyze] 未找到对应的持仓记录: ${symbol} ${positionSide}`);
         }
+      }
+
+      // 记录订单（检查是否已存在，避免重复保存）
+      let futuresOrder = await db.futuresOrder.findUnique({
+        where: { orderId: order.orderId.toString() }
       });
+      
+      if (!futuresOrder) {
+        // 如果订单不存在，创建新记录
+        futuresOrder = await db.futuresOrder.create({
+          data: {
+            accountId: futuresAccount.id,
+            orderId: order.orderId.toString(),
+            symbol,
+            side,
+            positionSide,
+            type: 'MARKET',
+            quantity: new Decimal(quantity),
+            executedQty: new Decimal(executedQty),
+            avgPrice: new Decimal(avgPrice),
+            status: order.status || 'FILLED',
+            pnl: orderPnl !== null ? new Decimal(orderPnl) : null,  // 保存盈亏
+            aiDecisionId: aiDecision.id
+          }
+        });
+      } else {
+        // 如果订单已存在，更新 pnl（平仓时可能之前没有 pnl）
+        if (orderPnl !== null && !futuresOrder.pnl) {
+          await db.futuresOrder.update({
+            where: { id: futuresOrder.id },
+            data: {
+              pnl: new Decimal(orderPnl),
+              status: order.status || 'FILLED',
+              executedQty: new Decimal(executedQty),
+              avgPrice: new Decimal(avgPrice)
+            }
+          });
+        }
+      }
 
       // 如果是开仓，创建持仓记录
       if (decision.action === 'OPEN_LONG' || decision.action === 'OPEN_SHORT') {
+        // 计算强平价格
+        // 维持保证金率（一般为 0.5% - 1%，这里使用 0.5%）
+        const maintenanceMarginRate = 0.005;
+        
+        let liquidationPrice: number;
+        if (positionSide === 'LONG') {
+          // 多单强平价格 = 开仓价 × (1 - 1/杠杆 + 维持保证金率)
+          liquidationPrice = parseFloat(avgPrice.toString()) * (1 - 1 / leverage + maintenanceMarginRate);
+        } else {
+          // 空单强平价格 = 开仓价 × (1 + 1/杠杆 - 维持保证金率)
+          liquidationPrice = parseFloat(avgPrice.toString()) * (1 + 1 / leverage - maintenanceMarginRate);
+        }
+        
         await db.futuresPosition.create({
           data: {
             accountId: futuresAccount.id,
             symbol,
             side: positionSide,
             leverage,
-            entryPrice: new Decimal(order.avgPrice || markPrice),
-            quantity: new Decimal(order.executedQty || quantity),
+            entryPrice: new Decimal(avgPrice),
+            quantity: new Decimal(executedQty),
             margin: new Decimal(margin),
             markPrice: new Decimal(markPrice),
+            liquidationPrice: new Decimal(liquidationPrice),
             aiDecisionId: aiDecision.id,
             status: 'OPEN'
           }
@@ -283,11 +363,11 @@ export async function POST(request: NextRequest) {
 
       // 保存余额快照
       try {
-        const balanceInfo = await getFuturesAccountBalance(client);
-        const totalBalance = parseFloat(balanceInfo.totalWalletBalance || '0');
-        const availableBalance = parseFloat(balanceInfo.availableBalance || '0');
-        const usedMargin = parseFloat(balanceInfo.totalInitialMargin || '0');
-        const unrealizedPnl = parseFloat(balanceInfo.totalUnrealizedProfit || '0');
+        const accountInfo = await getFuturesAccountInfo(client);
+        const totalBalance = parseFloat(accountInfo.totalWalletBalance || '0');
+        const availableBalance = parseFloat(accountInfo.availableBalance || '0');
+        const usedMargin = parseFloat(accountInfo.totalInitialMargin || '0');
+        const unrealizedPnl = parseFloat(accountInfo.totalUnrealizedProfit || '0');
 
         await db.futuresBalanceHistory.create({
           data: {
@@ -295,11 +375,11 @@ export async function POST(request: NextRequest) {
             totalBalance: new Decimal(totalBalance),
             availableBalance: new Decimal(availableBalance),
             usedMargin: new Decimal(usedMargin),
-            unrealizedPnl: new Decimal(unrealizedPnl)
+            unrealizedPnl: new Decimal(unrealizedPnl),
+            totalValueUSDT: new Decimal(totalBalance + unrealizedPnl)
           }
         });
       } catch (balanceError) {
-        console.error('[API] 保存余额快照失败:', balanceError);
       }
 
       return NextResponse.json({
@@ -319,7 +399,6 @@ export async function POST(request: NextRequest) {
         }
       });
     } catch (tradeError: any) {
-      console.error('[API] 合约交易执行失败:', tradeError);
       
       await db.futuresAIDecision.update({
         where: { id: aiDecision.id },
@@ -339,7 +418,6 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error: any) {
-    console.error('[API] 合约 AI 分析失败:', error);
     return NextResponse.json(
       { error: error.message || '合约 AI 分析失败' },
       { status: 500 }

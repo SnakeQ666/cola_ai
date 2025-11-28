@@ -19,7 +19,6 @@ export async function GET() {
       database: 'connected',
     })
   } catch (error: any) {
-    console.error('Health check failed:', error)
     
     return NextResponse.json(
       {

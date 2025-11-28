@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     
     // 获取当前账户 USDT 余额
     const currentUSDT = accountBalance.balances.find(b => b.asset === 'USDT')?.total || 0;
-    
+    console.log("currentUSDT", currentUSDT)
     // 计算所有交易（包括历史）花费的总 USDT
     let totalSpent = 0;
     for (const trade of allTrades) {
@@ -81,86 +81,73 @@ export async function GET(request: NextRequest) {
         totalSpent -= quoteQty; // 卖出时回收
       }
     }
-    
+    console.log("totalspent", totalSpent)
     // 初始投入 = 当前 USDT + 已花费的 USDT
     const initialInvestment = currentUSDT + totalSpent;
     
-    console.log(`[Portfolio] 当前 USDT: ${currentUSDT}, 总花费: ${totalSpent}, 初始投入: ${initialInvestment}`);
-    
-    // 先用所有交易计算当前持仓
-    const allHoldings: { [key: string]: number } = {};
-    let allUsdtInPortfolio = initialInvestment;
-    
-    for (const trade of allTrades) {
-      const symbol = trade.symbol;
-      const asset = symbol.replace('USDT', '');
-      const quantity = parseFloat(trade.quantity.toString());
-      const quoteQty = parseFloat(trade.quoteQty.toString());
-      
-      if (trade.side === 'BUY') {
-        allHoldings[asset] = (allHoldings[asset] || 0) + quantity;
-        allUsdtInPortfolio -= quoteQty;
-      } else if (trade.side === 'SELL') {
-        allHoldings[asset] = (allHoldings[asset] || 0) - quantity;
-        allUsdtInPortfolio += quoteQty;
-      }
-    }
-    
-    // 从初始投入开始，按时间计算每笔交易后的组合价值（只包含最近 7 天）
+    // 用所有交易计算历史数据点（确保历史数据准确）
     const portfolio: any[] = [];
     const holdings: { [key: string]: number } = {}; // AI 持仓
     let usdtInPortfolio = initialInvestment; // 组合中的 USDT
     
-    // 如果最近 7 天有交易，生成历史记录
-    if (trades.length > 0) {
-      for (const trade of trades) {
-        const symbol = trade.symbol;
-        const asset = symbol.replace('USDT', ''); // 提取币种，如 BTC
-        const quantity = parseFloat(trade.quantity.toString());
-        const quoteQty = parseFloat(trade.quoteQty.toString());
-        
-        if (trade.side === 'BUY') {
-          // 买入：增加币种持仓，减少 USDT
-          holdings[asset] = (holdings[asset] || 0) + quantity;
-          usdtInPortfolio -= quoteQty;
-        } else if (trade.side === 'SELL') {
-          // 卖出：减少币种持仓，增加 USDT
-          holdings[asset] = (holdings[asset] || 0) - quantity;
-          usdtInPortfolio += quoteQty;
-        }
-        
-        // 计算此刻的总资产价值
-        let totalValue = usdtInPortfolio;
-        
-        for (const [asset, amount] of Object.entries(holdings)) {
-          if (amount > 0) {
-            const assetSymbol = `${asset}USDT`;
-            const price = prices[assetSymbol];
-            
-            if (price) {
-              totalValue += amount * parseFloat(price);
-            }
-          }
-        }
-        
-        portfolio.push({
-          timestamp: trade.executedAt,
-          totalValueUSDT: totalValue,
-          holdings: { ...holdings },
-          usdtBalance: usdtInPortfolio,
-          initialInvestment, // 添加初始投入用于对比
-          pnl: totalValue - initialInvestment, // 盈亏
-          pnlPercent: ((totalValue - initialInvestment) / initialInvestment) * 100, // 盈亏百分比
-          trade: {
-            symbol: trade.symbol,
-            side: trade.side,
-            quantity,
-            quoteQty
-          }
-        });
+    // 遍历所有交易，生成完整的历史记录
+    for (const trade of allTrades) {
+      const symbol = trade.symbol;
+      const asset = symbol.replace('USDT', ''); // 提取币种，如 BTC
+      const quantity = parseFloat(trade.quantity.toString());
+      const quoteQty = parseFloat(trade.quoteQty.toString());
+      
+      if (trade.side === 'BUY') {
+        // 买入：增加币种持仓，减少 USDT
+        holdings[asset] = (holdings[asset] || 0) + quantity;
+        usdtInPortfolio -= quoteQty;
+      } else if (trade.side === 'SELL') {
+        // 卖出：减少币种持仓，增加 USDT
+        holdings[asset] = (holdings[asset] || 0) - quantity;
+        usdtInPortfolio += quoteQty;
       }
-    } else {
-      // 如果最近 7 天没有交易，添加一个当前状态的快照
+      
+      // 计算此刻的总资产价值
+      let totalValue = usdtInPortfolio;
+      
+      for (const [asset, amount] of Object.entries(holdings)) {
+        if (amount > 0) {
+          const assetSymbol = `${asset}USDT`;
+          const price = prices[assetSymbol];
+          
+          if (price) {
+            totalValue += amount * parseFloat(price);
+          }
+        }
+      }
+      
+      portfolio.push({
+        timestamp: trade.executedAt,
+        totalValueUSDT: totalValue,
+        holdings: { ...holdings },
+        usdtBalance: usdtInPortfolio,
+        initialInvestment, // 添加初始投入用于对比
+        pnl: totalValue - initialInvestment, // 盈亏
+        pnlPercent: initialInvestment > 0 ? ((totalValue - initialInvestment) / initialInvestment) * 100 : 0, // 盈亏百分比
+        trade: {
+          symbol: trade.symbol,
+          side: trade.side,
+          quantity,
+          quoteQty
+        }
+      });
+    }
+    
+    // 过滤出最近 N 天的数据用于图表显示
+    const recentPortfolio = portfolio.filter(p => p.timestamp >= startDate);
+    
+    // 计算当前持仓和总价值（使用所有交易计算的最终状态）
+    // 注意：holdings 和 usdtInPortfolio 已经在上面遍历所有交易时计算好了
+    const allHoldings = holdings;
+    const allUsdtInPortfolio = usdtInPortfolio;
+    
+    // 如果最近 N 天没有交易，添加一个当前状态的快照
+    if (recentPortfolio.length === 0) {
       let totalValue = allUsdtInPortfolio;
       
       for (const [asset, amount] of Object.entries(allHoldings)) {
@@ -174,7 +161,7 @@ export async function GET(request: NextRequest) {
         }
       }
       
-      portfolio.push({
+      recentPortfolio.push({
         timestamp: new Date(),
         totalValueUSDT: totalValue,
         holdings: { ...allHoldings },
@@ -220,18 +207,18 @@ export async function GET(request: NextRequest) {
     }
     
     // 返回两种格式：
-    // 1. portfolio 数组（兼容旧前端）
+    // 1. portfolio 数组（最近 N 天的数据，用于图表显示）
     // 2. 新的汇总数据
     return NextResponse.json({
       success: true,
-      portfolio, // 原始数组格式，兼容旧代码
+      portfolio: recentPortfolio, // 最近 N 天的数据，用于图表显示
       // 新的汇总格式
       initialInvestment,
       currentValue,
       pnl: currentValue - initialInvestment,
       pnlPercent: initialInvestment > 0 ? ((currentValue - initialInvestment) / initialInvestment) * 100 : 0,
       holdings: currentHoldings,
-      history: portfolio.map(p => ({
+      history: recentPortfolio.map(p => ({
         time: new Date(p.timestamp).toLocaleString('zh-CN', {
           month: '2-digit',
           day: '2-digit',
@@ -242,7 +229,6 @@ export async function GET(request: NextRequest) {
       }))
     });
   } catch (error: any) {
-    console.error('[API] 获取 AI 资产组合失败:', error);
     return NextResponse.json(
       { error: '获取资产组合失败: ' + error.message },
       { status: 500 }

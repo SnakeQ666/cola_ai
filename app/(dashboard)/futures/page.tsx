@@ -22,6 +22,16 @@ export default function FuturesPage() {
   const [decisions, setDecisions] = useState<any[]>([]);
   const [expandedDecisionId, setExpandedDecisionId] = useState<string | null>(null);
   const [balanceHistory, setBalanceHistory] = useState<any[]>([]);
+  const [aiPortfolio, setAiPortfolio] = useState<any>({
+    portfolio: [],
+    initialInvestment: 0,
+    currentValue: 0,
+    pnl: 0,
+    pnlPercent: 0,
+    positions: [],
+    history: []
+  });
+  const [closedPositions, setClosedPositions] = useState<any[]>([]);
 
   useEffect(() => {
     loadAccount();
@@ -34,6 +44,8 @@ export default function FuturesPage() {
       loadPositions();
       loadDecisions();
       loadBalanceHistory();
+      loadAiPortfolio();
+      loadClosedPositions();
 
       // 定时刷新数据
       const interval = setInterval(() => {
@@ -41,6 +53,8 @@ export default function FuturesPage() {
         loadPositions();
         loadDecisions();
         loadBalanceHistory();
+        loadAiPortfolio();
+        loadClosedPositions();
       }, 30000); // 30秒刷新一次
 
       return () => clearInterval(interval);
@@ -53,8 +67,6 @@ export default function FuturesPage() {
       // 使用用户配置的交易间隔
       const intervalMinutes = account.tradeInterval || 5;
       const intervalMs = intervalMinutes * 60 * 1000;
-      
-      console.log(`[Futures] AI 自动交易已启用，间隔: ${intervalMinutes} 分钟`);
       
       const interval = setInterval(() => {
         handleAnalyze();
@@ -80,7 +92,6 @@ export default function FuturesPage() {
         loadPositions();
       }
     } catch (error) {
-      console.error('加载合约账户失败:', error);
     } finally {
       setLoading(false);
     }
@@ -94,7 +105,6 @@ export default function FuturesPage() {
         setBalance(data);
       }
     } catch (error) {
-      console.error('加载余额失败:', error);
     }
   };
 
@@ -106,7 +116,6 @@ export default function FuturesPage() {
         setPositions(data.positions || []);
       }
     } catch (error) {
-      console.error('加载持仓失败:', error);
     }
   };
 
@@ -118,7 +127,6 @@ export default function FuturesPage() {
         setDecisions(data.decisions || []);
       }
     } catch (error) {
-      console.error('加载决策历史失败:', error);
     }
   };
 
@@ -144,7 +152,6 @@ export default function FuturesPage() {
                 });
               }
             } catch (e) {
-              console.error('解析日期失败:', e);
             }
           }
           
@@ -156,7 +163,37 @@ export default function FuturesPage() {
         setBalanceHistory(chartData);
       }
     } catch (error) {
-      console.error('加载余额历史失败:', error);
+    }
+  };
+
+  const loadAiPortfolio = async () => {
+    try {
+      const res = await fetch('/api/futures/portfolio?days=7');
+      const data = await res.json();
+      
+      if (data.success) {
+        setAiPortfolio({
+          portfolio: data.portfolio || [],
+          initialInvestment: data.initialInvestment || 0,
+          currentValue: data.currentValue || 0,
+          pnl: data.pnl || 0,
+          pnlPercent: data.pnlPercent || 0,
+          positions: data.positions || [],
+          history: data.history || []
+        });
+      }
+    } catch (error) {
+    }
+  };
+
+  const loadClosedPositions = async () => {
+    try {
+      const res = await fetch('/api/futures/closed-positions');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setClosedPositions(data.closedPositions || []);
+      }
+    } catch (error) {
     }
   };
 
@@ -178,6 +215,7 @@ export default function FuturesPage() {
           loadPositions();
           loadDecisions();
           loadBalanceHistory();
+          loadClosedPositions();
         } else {
           toast.info(data.reason || '未执行交易');
           loadDecisions();
@@ -186,7 +224,6 @@ export default function FuturesPage() {
         toast.error(data.error || 'AI 分析失败');
       }
     } catch (error) {
-      console.error('AI 分析失败:', error);
       toast.error('AI 分析失败');
     } finally {
       setAnalyzing(false);
@@ -387,7 +424,7 @@ export default function FuturesPage() {
             <CardTitle>账户余额</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div>
                 <Label className="text-sm text-muted-foreground">总余额</Label>
                 <p className="text-2xl font-bold text-blue-500">${balance.totalBalance?.toFixed(2)}</p>
@@ -404,6 +441,12 @@ export default function FuturesPage() {
                 <Label className="text-sm text-muted-foreground">未实现盈亏</Label>
                 <p className={`text-2xl font-bold ${balance.unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {balance.unrealizedPnl >= 0 ? '+' : ''}${balance.unrealizedPnl?.toFixed(2)}
+                </p>
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">已实现盈亏</Label>
+                <p className={`text-2xl font-bold ${(balance.realizedPnl || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {(balance.realizedPnl || 0) >= 0 ? '+' : ''}${(balance.realizedPnl || 0)?.toFixed(2)}
                 </p>
               </div>
             </div>
@@ -439,6 +482,103 @@ export default function FuturesPage() {
         </Card>
       )}
 
+      {/* AI 资产组合表现 */}
+      {connected && (
+        <Card>
+          <CardHeader>
+            <CardTitle>AI 资产组合表现</CardTitle>
+            <CardDescription>AI 管理的合约资产盈亏表现</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* 统计信息 */}
+            <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 bg-secondary rounded-lg">
+                <div className="text-xs text-muted-foreground">初始投入</div>
+                <div className="text-lg font-bold mt-1">
+                  ${aiPortfolio.initialInvestment?.toFixed(2) || '0.00'}
+                </div>
+              </div>
+              <div className="p-3 bg-secondary rounded-lg">
+                <div className="text-xs text-muted-foreground">当前价值</div>
+                <div className="text-lg font-bold mt-1">
+                  ${aiPortfolio.currentValue?.toFixed(2) || '0.00'}
+                </div>
+              </div>
+              <div className={`p-3 rounded-lg ${
+                (aiPortfolio.pnl || 0) >= 0 
+                  ? 'bg-green-500/10 border border-green-500/20' 
+                  : 'bg-red-500/10 border border-red-500/20'
+              }`}>
+                <div className="text-xs text-muted-foreground">盈亏</div>
+                <div className={`text-lg font-bold mt-1 ${
+                  (aiPortfolio.pnl || 0) >= 0 
+                    ? 'text-green-600' 
+                    : 'text-red-600'
+                }`}>
+                  {(aiPortfolio.pnl || 0) >= 0 ? '+' : ''}
+                  ${aiPortfolio.pnl?.toFixed(2) || '0.00'}
+                </div>
+              </div>
+              <div className={`p-3 rounded-lg ${
+                (aiPortfolio.pnlPercent || 0) >= 0 
+                  ? 'bg-green-500/10 border border-green-500/20' 
+                  : 'bg-red-500/10 border border-red-500/20'
+              }`}>
+                <div className="text-xs text-muted-foreground">收益率</div>
+                <div className={`text-lg font-bold mt-1 ${
+                  (aiPortfolio.pnlPercent || 0) >= 0 
+                    ? 'text-green-600' 
+                    : 'text-red-600'
+                }`}>
+                  {(aiPortfolio.pnlPercent || 0) >= 0 ? '+' : ''}
+                  {aiPortfolio.pnlPercent?.toFixed(2) || '0.00'}%
+                </div>
+              </div>
+            </div>
+
+            {/* 图表 */}
+            {aiPortfolio.portfolio && aiPortfolio.portfolio.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={aiPortfolio.portfolio}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="timestamp" 
+                    tickFormatter={(value) => {
+                      const date = new Date(value);
+                      return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+                    }}
+                  />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value: any) => [`$${value.toFixed(2)}`, 'AI 组合价值']}
+                    labelFormatter={(label) => {
+                      const date = new Date(label);
+                      return date.toLocaleString('zh-CN');
+                    }}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="totalValueUSDT" 
+                    stroke="#10b981" 
+                    strokeWidth={2}
+                    name="组合价值 (USDT)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                <div className="text-center">
+                  <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>暂无交易数据</p>
+                  <p className="text-sm mt-1">开启自动交易后将显示 AI 资产组合表现</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* 当前持仓 */}
       {positions.length > 0 && (
         <Card>
@@ -447,7 +587,7 @@ export default function FuturesPage() {
             <CardDescription>AI 管理的合约持仓</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="max-h-[600px] overflow-y-auto space-y-4 pr-2">
               {positions.map((pos, index) => (
                 <div key={index} className="p-4 border rounded-lg">
                   <div className="flex items-center justify-between mb-2">
@@ -487,6 +627,77 @@ export default function FuturesPage() {
         </Card>
       )}
 
+      {/* 已平仓交易 */}
+      {closedPositions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>已平仓交易</CardTitle>
+            <CardDescription>已完成的合约交易记录（开仓+平仓）</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-[600px] overflow-y-auto space-y-4 pr-2">
+              {closedPositions.map((position, index) => (
+                <div key={position.id || index} className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-lg">{position.symbol}</span>
+                      <Badge variant={position.positionSide === 'LONG' ? 'default' : 'destructive'}>
+                        {position.positionSide}
+                        {position.leverage && ` ${position.leverage}x`}
+                      </Badge>
+                    </div>
+                    <div className={`text-lg font-bold ${position.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {position.pnl >= 0 ? '+' : ''}${position.pnl.toFixed(2)}
+                      <span className="text-sm ml-1">
+                        ({position.pnlPercent >= 0 ? '+' : ''}{position.pnlPercent.toFixed(2)}%)
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+                    <div>
+                      <span className="text-muted-foreground">开仓价: </span>
+                      <span className="font-medium">${position.openOrder.price.toFixed(2)}</span>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {new Date(position.openOrder.executedAt).toLocaleString('zh-CN')}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">平仓价: </span>
+                      <span className="font-medium">${position.closeOrder.price.toFixed(2)}</span>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {new Date(position.closeOrder.executedAt).toLocaleString('zh-CN')}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">数量: </span>
+                      <span className="font-medium">{position.openOrder.quantity.toFixed(4)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">持仓时长: </span>
+                      <span className="font-medium">
+                        {position.duration.days > 0 
+                          ? `${position.duration.days}天${position.duration.hours % 24}小时`
+                          : `${position.duration.hours}小时`
+                        }
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {position.aiDecision && (
+                    <div className="mt-3 pt-3 border-t text-xs">
+                      <div className="text-muted-foreground mb-1">AI 决策理由:</div>
+                      <div className="text-sm">{position.aiDecision.reasoning}</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      
       {/* AI 决策历史 */}
       {decisions.length > 0 && (
         <Card>
@@ -613,7 +824,8 @@ export default function FuturesPage() {
                                   </Badge>
                                 </div>
                                 <div className="text-muted-foreground mt-1">
-                                  数量: {order.quantity} | 价格: ${order.price?.toFixed(2)}
+                                  
+                                  数量: {order.quantity} | 价格: ${Number(order?.avgPrice)?.toFixed(2)}
                                   {order.pnl && (
                                     <span className={order.pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
                                       {' '}| PnL: {order.pnl >= 0 ? '+' : ''}${order.pnl.toFixed(2)}

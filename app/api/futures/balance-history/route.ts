@@ -47,7 +47,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ history: serializedHistory });
   } catch (error: any) {
-    console.error('[API] 获取合约余额历史失败:', error);
     return NextResponse.json(
       { error: error.message || '获取合约余额历史失败' },
       { status: 500 }

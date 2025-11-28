@@ -48,15 +48,12 @@ export async function GET(request: NextRequest) {
             if (price) {
               const valueInUSDT = b.total * parseFloat(price);
               totalValueUSDT += valueInUSDT;
-              console.log(`[Balance] ${b.asset}: ${b.total} × $${price} = $${valueInUSDT.toFixed(2)}`);
             } else {
               console.warn(`[Balance] 无法获取 ${symbol} 价格，跳过`);
             }
           }
         }
       }
-      
-      console.log(`[Balance] 总资产价值: $${totalValueUSDT.toFixed(2)} USDT`);
       
       await db.balanceHistory.create({
         data: {
@@ -66,7 +63,6 @@ export async function GET(request: NextRequest) {
         }
       });
     } catch (snapshotError) {
-      console.error('[API] 记录余额快照失败:', snapshotError);
       // 不影响主流程，继续返回余额
     }
     
@@ -76,7 +72,6 @@ export async function GET(request: NextRequest) {
       isTestnet: account.isTestnet
     });
   } catch (error: any) {
-    console.error('[API] 获取余额失败:', error);
     return NextResponse.json(
       { error: error.message || '获取余额失败' },
       { status: 500 }

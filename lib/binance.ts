@@ -71,7 +71,6 @@ export async function testBinanceConnection(
       }
     };
   } catch (error: any) {
-    console.error('[Binance] 连接测试失败:', error);
     
     return {
       success: false,
@@ -103,7 +102,6 @@ export async function getAccountBalance(client: any) {
       updateTime: new Date()
     };
   } catch (error: any) {
-    console.error('[Binance] 获取余额失败:', error);
     throw new Error('获取账户余额失败: ' + error.message);
   }
 }
@@ -134,7 +132,6 @@ export async function getKlineData(
       closeTime: new Date(c.closeTime)
     }));
   } catch (error: any) {
-    console.error('[Binance] 获取K线失败:', error);
     throw new Error('获取K线数据失败: ' + error.message);
   }
 }
@@ -147,7 +144,6 @@ export async function getCurrentPrice(client: any, symbol: string): Promise<numb
     const ticker = await client.prices({ symbol });
     return parseFloat(ticker[symbol]);
   } catch (error: any) {
-    console.error('[Binance] 获取价格失败:', error);
     throw new Error('获取当前价格失败: ' + error.message);
   }
 }
@@ -185,7 +181,6 @@ export async function getSymbolInfo(client: any, symbol: string) {
       minNotional: parseFloat(minNotional?.minNotional || minNotional?.notional || '0')
     };
   } catch (error: any) {
-    console.error('[Binance] 获取交易对信息失败:', error);
     throw new Error('获取交易对信息失败: ' + error.message);
   }
 }
@@ -232,9 +227,6 @@ export async function placeMarketOrder(
     // 调整数量以符合规则
     const adjustedQuantity = adjustQuantity(quantity, symbolInfo);
     
-    console.log(`[Binance] 原始数量: ${quantity}, 调整后: ${adjustedQuantity}`);
-    console.log(`[Binance] 交易规则 - 最小: ${symbolInfo.minQty}, 最大: ${symbolInfo.maxQty}, 步长: ${symbolInfo.stepSize}`);
-    
     // 验证最小交易金额
     const currentPrice = await getCurrentPrice(client, symbol);
     const orderValue = adjustedQuantity * currentPrice;
@@ -267,7 +259,6 @@ export async function placeMarketOrder(
       transactTime: new Date(order.transactTime)
     };
   } catch (error: any) {
-    console.error('[Binance] 下单失败:', error);
     throw new Error('下单失败: ' + error.message);
   }
 }

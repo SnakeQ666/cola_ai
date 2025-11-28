@@ -47,7 +47,6 @@ export async function uploadFileToOSS(
       key: result.name,
     };
   } catch (error) {
-    console.error('OSS上传失败:', error);
     throw new Error('文件上传失败');
   }
 }
@@ -72,7 +71,6 @@ export async function getSignedUrl(
     
     return url;
   } catch (error) {
-    console.error('获取签名URL失败:', error);
     throw new Error('获取文件链接失败');
   }
 }
@@ -87,7 +85,6 @@ export async function deleteFileFromOSS(key: string): Promise<void> {
   try {
     await client.delete(key);
   } catch (error) {
-    console.error('删除文件失败:', error);
     throw new Error('删除文件失败');
   }
 }
@@ -102,7 +99,6 @@ export async function deleteMultipleFiles(keys: string[]): Promise<void> {
   try {
     await client.deleteMulti(keys);
   } catch (error) {
-    console.error('批量删除文件失败:', error);
     throw new Error('批量删除文件失败');
   }
 }
@@ -126,7 +122,6 @@ export async function listFiles(
     
     return result.objects || [];
   } catch (error) {
-    console.error('列出文件失败:', error);
     throw new Error('获取文件列表失败');
   }
 }

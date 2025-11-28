@@ -70,10 +70,7 @@ export default function TradingPage() {
       if (account.enableAutoTrade) {
         const intervalMinutes = (account as any).tradeInterval || 5;
         const intervalMs = intervalMinutes * 60 * 1000;
-        console.log(`[Auto Trading] 自动交易已启用，间隔: ${intervalMinutes} 分钟`);
-        
         analysisInterval = setInterval(() => {
-          console.log('[Auto Trading] 执行定时分析');
           handleAnalyze();
         }, intervalMs);
       }
@@ -98,7 +95,6 @@ export default function TradingPage() {
         setAccount(data.account);
       }
     } catch (error) {
-      console.error('加载账户失败:', error);
     } finally {
       setLoading(false);
     }
@@ -113,7 +109,6 @@ export default function TradingPage() {
         setBalance(data.balance.balances);
       }
     } catch (error) {
-      console.error('加载余额失败:', error);
     }
   };
 
@@ -128,10 +123,8 @@ export default function TradingPage() {
           setLatestDecision(data.decisions[0]);
         }
       } else {
-        console.error('加载决策历史失败:', data.error);
       }
     } catch (error) {
-      console.error('加载决策历史失败:', error);
     }
   };
 
@@ -144,7 +137,6 @@ export default function TradingPage() {
         setBalanceHistory(data.history || []);
       }
     } catch (error) {
-      console.error('加载余额历史失败:', error);
     }
   };
 
@@ -152,12 +144,10 @@ export default function TradingPage() {
     try {
       const response = await fetch('/api/trading/portfolio?days=7');
       const data = await response.json();
-      
       if (data.success) {
         setAiPortfolio(data.portfolio || []);
       }
     } catch (error) {
-      console.error('加载 AI 资产组合失败:', error);
     }
   };
 
@@ -681,6 +671,7 @@ export default function TradingPage() {
                       <div className="text-sm font-medium mb-2">当前 AI 持仓</div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {Object.entries(aiPortfolio[aiPortfolio.length - 1].holdings).map(([asset, amount]: [string, any]) => (
+                       
                           amount > 0 && (
                             <div key={asset} className="text-sm">
                               <span className="text-muted-foreground">{asset}:</span>

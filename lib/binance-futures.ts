@@ -37,19 +37,52 @@ export async function getUserBinanceFuturesClient(userId: string) {
   return { client, account };
 }
 
-// 获取合约账户余额
+// 获取合约账户余额（返回余额数组）
 export async function getFuturesAccountBalance(client: any) {
   try {
     const accountInfo = await client.futuresAccountBalance();
     return Array.isArray(accountInfo) ? accountInfo : [];
   } catch (error: any) {
-    console.error('[Binance Futures] 获取账户余额失败:', error);
     // 如果是测试网或权限问题，返回空数组
     if (error.message?.includes('testnet') || error.message?.includes('Invalid')) {
-      console.log('[Binance Futures] 返回空余额列表');
       return [];
     }
     throw new Error(`获取账户余额失败: ${error.message}`);
+  }
+}
+
+// 获取合约账户信息（返回账户对象，包含总余额、未实现盈亏等）
+export async function getFuturesAccountInfo(client: any) {
+  try {
+    // 方法1: 尝试使用 futuresAccountInfo
+    try {
+      const accountInfo = await client.futuresAccountInfo();
+      return accountInfo;
+    } catch (err: any) {
+      console.warn('[Binance Futures] futuresAccountInfo 不可用，尝试其他方法:', err.message);
+    }
+    
+    // 方法2: 使用 futuresAccountBalance 并构造账户信息对象
+    const balances = await client.futuresAccountBalance();
+    
+    // 找到 USDT 余额
+    const usdtBalance = balances.find((b: any) => b.asset === 'USDT');
+    
+    if (!usdtBalance) {
+      throw new Error('未找到 USDT 余额');
+    }
+    
+    // 构造账户信息对象
+    const accountInfo = {
+      totalWalletBalance: usdtBalance.balance || '0',
+      availableBalance: usdtBalance.availableBalance || '0',
+      totalInitialMargin: parseFloat(usdtBalance.balance || '0') - parseFloat(usdtBalance.availableBalance || '0'),
+      totalUnrealizedProfit: usdtBalance.crossUnPnl || '0'
+    };
+    
+    return accountInfo;
+  } catch (error: any) {
+    throw new Error(`获取账户信息失败: ${error.message}`);
   }
 }
 
@@ -67,10 +100,8 @@ export async function getFuturesPositions(client: any, symbol?: string) {
     }
     return [];
   } catch (error: any) {
-    console.error('[Binance Futures] 获取持仓信息失败:', error);
     // 如果是测试网或没有持仓，返回空数组而不是抛出错误
     if (error.message?.includes('Invalid symbol') || error.message?.includes('testnet')) {
-      console.log('[Binance Futures] 返回空持仓列表');
       return [];
     }
     throw new Error(`获取持仓信息失败: ${error.message}`);
@@ -86,7 +117,6 @@ export async function setLeverage(client: any, symbol: string, leverage: number)
     });
     return result;
   } catch (error: any) {
-    console.error('[Binance Futures] 设置杠杆失败:', error);
     throw new Error(`设置杠杆失败: ${error.message}`);
   }
 }
@@ -104,7 +134,6 @@ export async function setMarginType(client: any, symbol: string, marginType: 'IS
     if (error.message?.includes('No need to change margin type')) {
       return { success: true, message: '保证金模式已是目标模式' };
     }
-    console.error('[Binance Futures] 设置保证金模式失败:', error);
     throw new Error(`设置保证金模式失败: ${error.message}`);
   }
 }
@@ -125,7 +154,8 @@ export async function placeFuturesMarketOrder(
       symbol,
       side,
       type: 'MARKET',
-      quantity: quantity.toString()
+      quantity: quantity.toString(),
+      newOrderRespType: 'RESULT'
     };
 
     // 双向持仓模式：必须指定 positionSide
@@ -139,12 +169,23 @@ export async function placeFuturesMarketOrder(
       // 不设置 positionSide 参数
     }
 
-    console.log('[Binance Futures] 下单参数:', orderParams);
     const order = await client.futuresOrder(orderParams);
-    console.log('[Binance Futures] 订单成功:', order);
+    
+    // 如果市价单没有立即返回 avgPrice，查询订单详情
+    if ((!order.avgPrice || order.avgPrice === '0') && order.orderId) {
+      try {
+        const orderDetail = await client.futuresGetOrder({
+          symbol,
+          orderId: order.orderId
+        });
+        return orderDetail;
+      } catch (err) {
+        console.warn('[Binance Futures] 查询订单详情失败:', err);
+      }
+    }
+    
     return order;
   } catch (error: any) {
-    console.error('[Binance Futures] 下单失败:', error);
     throw new Error(`下单失败: ${error.message}`);
   }
 }
@@ -170,7 +211,6 @@ export async function closeFuturesPosition(
     
     return order;
   } catch (error: any) {
-    console.error('[Binance Futures] 平仓失败:', error);
     throw new Error(`平仓失败: ${error.message}`);
   }
 }
@@ -207,7 +247,6 @@ export async function getFuturesSymbolInfo(client: any, symbol: string) {
       minNotional: minNotionalFilter?.notional
     };
   } catch (error: any) {
-    console.error('[Binance Futures] 获取交易对信息失败:', error);
     throw new Error(`获取交易对信息失败: ${error.message}`);
   }
 }
@@ -259,10 +298,8 @@ export async function getFuturesKlineData(
       closeTime: candle.closeTime
     }));
   } catch (error: any) {
-    console.error('[Binance Futures] 获取K线数据失败:', error);
     // 如果是无效币种，返回空数组让 AI 跳过
     if (error.message?.includes('Invalid symbol')) {
-      console.log(`[Binance Futures] ${symbol} 无效，跳过`);
       return [];
     }
     throw new Error(`获取K线数据失败: ${error.message}`);
@@ -278,9 +315,7 @@ export async function getFuturesMarkPrice(client: any, symbol: string) {
     }
     return parseFloat(markPrice.markPrice);
   } catch (error: any) {
-    console.error('[Binance Futures] 获取标记价格失败:', error);
     if (error.message?.includes('Invalid symbol')) {
-      console.log(`[Binance Futures] ${symbol} 无效，返回 0`);
       return 0;
     }
     throw new Error(`获取标记价格失败: ${error.message}`);
@@ -299,7 +334,6 @@ export async function getFundingRate(client: any, symbol: string) {
     }
     return null;
   } catch (error: any) {
-    console.error('[Binance Futures] 获取资金费率失败:', error);
     return null;
   }
 }
@@ -310,7 +344,6 @@ export async function getFuturesExchangeInfo(client: any) {
     const exchangeInfo = await client.futuresExchangeInfo();
     return exchangeInfo;
   } catch (error: any) {
-    console.error('[Binance Futures] 获取交易所信息失败:', error);
     throw new Error(`获取交易所信息失败: ${error.message}`);
   }
 }
@@ -321,7 +354,6 @@ export async function getPositionMode(client: any) {
     const result = await client.futuresPositionSideDual();
     return result.dualSidePosition; // true = 双向持仓, false = 单向持仓
   } catch (error: any) {
-    console.error('[Binance Futures] 获取持仓模式失败:', error);
     return false; // 默认单向持仓
   }
 }
@@ -330,10 +362,8 @@ export async function getPositionMode(client: any) {
 export async function setPositionMode(client: any, dualSidePosition: boolean) {
   try {
     await client.futuresPositionSideDual({ dualSidePosition });
-    console.log(`[Binance Futures] 持仓模式已设置为: ${dualSidePosition ? '双向持仓' : '单向持仓'}`);
     return true;
   } catch (error: any) {
-    console.error('[Binance Futures] 设置持仓模式失败:', error);
     throw new Error(`设置持仓模式失败: ${error.message}`);
   }
 }
@@ -346,7 +376,6 @@ export async function getAllFuturesSymbols(client: any) {
       .filter((s: any) => s.status === 'TRADING' && s.quoteAsset === 'USDT')
       .map((s: any) => s.symbol);
   } catch (error: any) {
-    console.error('[Binance Futures] 获取交易对列表失败:', error);
     throw new Error(`获取交易对列表失败: ${error.message}`);
   }
 }

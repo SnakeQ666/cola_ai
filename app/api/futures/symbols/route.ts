@@ -25,7 +25,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ symbols });
   } catch (error: any) {
-    console.error('[API] 获取合约交易对失败:', error);
     return NextResponse.json(
       { error: error.message || '获取合约交易对失败' },
       { status: 500 }

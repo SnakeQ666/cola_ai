@@ -137,8 +137,30 @@ export async function POST(request: NextRequest) {
       
       // 风控检查3: 验证 AI 建议的交易金额
       const maxAmount = parseFloat(account.maxTradeAmount.toString());
-      const aiTradeAmount = decision.tradeAmount || 0;
+      let aiTradeAmount = decision.tradeAmount || 0;
       const MIN_TRADE_VALUE = 5; // Binance 最小交易金额
+      
+      // 对于卖出操作，如果 AI 没有给出金额，自动使用持仓价值
+      if (decision.action === 'SELL' && aiTradeAmount <= 0) {
+        // 从 AI 决策中获取持仓信息
+        const aiDecisionData = await db.aIDecision.findUnique({
+          where: { id: aiDecision.id },
+          select: { accountBalance: true }
+        });
+        
+        const accountBalanceData = aiDecisionData?.accountBalance as any;
+        const holdings = accountBalanceData?.aiHoldings || {};
+        
+        // 查找要卖出的币种的持仓
+        const asset = symbol.replace('USDT', '');
+        const holdingQty = holdings[asset] || 0;
+        
+        if (holdingQty > 0) {
+          const { getCurrentPrice } = await import('@/lib/binance');
+          const currentPrice = await getCurrentPrice(client, symbol);
+          aiTradeAmount = holdingQty * currentPrice;
+        }
+      }
       
       // 检查 AI 是否给出了交易金额
       if (aiTradeAmount <= 0) {
@@ -156,7 +178,7 @@ export async function POST(request: NextRequest) {
           reasoning: result.reasoning,
           decisionId: result.aiDecision.id,
           executed: false,
-          reason: 'AI 未给出有效的交易金额'
+          reason: 'AI 未给出有效的交易金额，且无可卖出的持仓'
         });
       }
       
@@ -207,8 +229,6 @@ export async function POST(request: NextRequest) {
       // 根据 AI 建议的金额计算交易数量
       let quantity = aiTradeAmount / currentPrice;
       
-      console.log(`[Trading] AI 建议: $${aiTradeAmount}, 计算数量: ${quantity} ${symbol}`);
-
       const order = await placeMarketOrder(
         client,
         symbol,
@@ -260,7 +280,6 @@ export async function POST(request: NextRequest) {
         }
       });
     } catch (tradeError: any) {
-      console.error('[API] 交易执行失败:', tradeError);
       
       await db.aIDecision.update({
         where: { id: aiDecision.id },
@@ -280,7 +299,6 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error: any) {
-    console.error('[API] AI 分析失败:', error);
     return NextResponse.json(
       { error: error.message || 'AI 分析失败' },
       { status: 500 }

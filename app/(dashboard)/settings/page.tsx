@@ -49,7 +49,6 @@ export default function SettingsPage() {
         toast.error(data.error || '加载用户信息失败')
       }
     } catch (error) {
-      console.error('加载用户信息失败:', error)
       toast.error('加载用户信息失败')
     } finally {
       setLoading(false)
@@ -85,7 +84,6 @@ export default function SettingsPage() {
         toast.error(data.error || '更新失败')
       }
     } catch (error) {
-      console.error('更新失败:', error)
       toast.error('更新失败，请稍后重试')
     } finally {
       setSaving(false)
@@ -119,7 +117,6 @@ export default function SettingsPage() {
       setUser((prev) => (prev ? { ...prev, avatar: data.url } as UserProfile : prev))
       toast.success('头像上传成功')
     } catch (e: any) {
-      console.error('头像上传失败:', e)
       toast.error(e.message || '头像上传失败')
     } finally {
       setUploadingAvatar(false)
@@ -134,7 +131,6 @@ export default function SettingsPage() {
       router.push('/auth/login')
       router.refresh()
     } catch (error) {
-      console.error('退出登录失败:', error)
       toast.error('退出登录失败')
     }
   }

@@ -22,7 +22,6 @@ export default function TradeHistoryPage() {
         setTrades(data.trades);
       }
     } catch (error) {
-      console.error('加载交易记录失败:', error);
     } finally {
       setLoading(false);
     }

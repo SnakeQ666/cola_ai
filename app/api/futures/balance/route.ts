@@ -40,6 +40,18 @@ export async function GET(request: NextRequest) {
     const usedMargin = totalBalance - availableBalance;
     const unrealizedPnl = parseFloat(usdtBalance.crossUnPnl || '0');
 
+    // 计算已实现盈亏（所有平仓订单的 pnl 累加）
+    const orders = await db.futuresOrder.findMany({
+      where: {
+        accountId: futuresAccount.id,
+        pnl: { not: null }
+      }
+    });
+
+    const realizedPnl = orders.reduce((sum, order) => {
+      return sum + parseFloat(order.pnl?.toString() || '0');
+    }, 0);
+
     // 保存余额历史
     await db.futuresBalanceHistory.create({
       data: {
@@ -57,10 +69,10 @@ export async function GET(request: NextRequest) {
       availableBalance,
       usedMargin,
       unrealizedPnl,
+      realizedPnl,
       totalValue: totalBalance + unrealizedPnl
     });
   } catch (error: any) {
-    console.error('[API] 获取合约余额失败:', error);
     return NextResponse.json(
       { error: error.message || '获取合约余额失败' },
       { status: 500 }

@@ -83,7 +83,6 @@ export async function POST(request: NextRequest) {
       order
     });
   } catch (error: any) {
-    console.error('[API] 交易失败:', error);
     return NextResponse.json(
       { error: '交易失败: ' + error.message },
       { status: 500 }

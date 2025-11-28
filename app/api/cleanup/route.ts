@@ -132,15 +132,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('[Cleanup] 数据清理完成:', results);
-
     return NextResponse.json({
       success: true,
       message: '数据清理完成',
       results
     });
   } catch (error: any) {
-    console.error('[Cleanup] 数据清理失败:', error);
     return NextResponse.json(
       { error: '数据清理失败: ' + error.message },
       { status: 500 }

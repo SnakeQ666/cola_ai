@@ -289,6 +289,9 @@ model FuturesOrder {
   // 状态
   status          String   // NEW / FILLED / CANCELED / EXPIRED
   
+  // 盈亏信息
+  pnl             Decimal? @db.Decimal(20, 8) // 已实现盈亏（平仓时记录）
+  
   // AI 决策信息
   aiDecisionId    String?
   aiDecision      FuturesAIDecision? @relation(fields: [aiDecisionId], references: [id])

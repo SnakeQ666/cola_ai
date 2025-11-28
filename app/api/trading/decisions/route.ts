@@ -38,7 +38,6 @@ export async function GET(request: NextRequest) {
       decisions
     });
   } catch (error: any) {
-    console.error('[API] 获取决策历史失败:', error);
     return NextResponse.json(
       { error: '获取决策历史失败: ' + error.message },
       { status: 500 }

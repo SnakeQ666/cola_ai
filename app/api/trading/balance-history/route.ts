@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
       snapshot
     });
   } catch (error: any) {
-    console.error('[API] 记录余额快照失败:', error);
     return NextResponse.json(
       { error: '记录余额失败: ' + error.message },
       { status: 500 }
@@ -105,7 +104,6 @@ export async function GET(request: NextRequest) {
       }))
     });
   } catch (error: any) {
-    console.error('[API] 获取余额历史失败:', error);
     return NextResponse.json(
       { error: '获取余额历史失败: ' + error.message },
       { status: 500 }

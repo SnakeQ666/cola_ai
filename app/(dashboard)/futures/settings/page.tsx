@@ -45,7 +45,6 @@ export default function FuturesSettingsPage() {
         setAllowedSymbols(data.account.allowedSymbols || []);
       }
     } catch (error) {
-      console.error('加载账户失败:', error);
       toast.error('加载账户失败');
     } finally {
       setLoading(false);
@@ -61,7 +60,6 @@ export default function FuturesSettingsPage() {
         setAvailableSymbols(data.symbols);
       }
     } catch (error) {
-      console.error('加载交易对失败:', error);
     }
   };
 

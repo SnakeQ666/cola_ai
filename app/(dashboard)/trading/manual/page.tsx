@@ -26,7 +26,6 @@ export default function ManualTradePage() {
         setBalance(data.balance);
       }
     } catch (error) {
-      console.error('加载余额失败:', error);
     }
   };
 

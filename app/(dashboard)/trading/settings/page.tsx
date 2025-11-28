@@ -44,7 +44,6 @@ export default function TradingSettingsPage() {
         setAllowedSymbols(data.account.allowedSymbols || []);
       }
     } catch (error) {
-      console.error('加载设置失败:', error);
     } finally {
       setLoading(false);
     }
@@ -59,7 +58,6 @@ export default function TradingSettingsPage() {
         setAvailableSymbols(data.symbols);
       }
     } catch (error) {
-      console.error('加载交易对失败:', error);
     }
   };
 

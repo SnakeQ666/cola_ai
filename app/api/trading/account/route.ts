@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
         id: true,
         isTestnet: true,
         enableAutoTrade: true,
+        tradeInterval: true,
         maxTradeAmount: true,
         maxDailyLoss: true,
         allowedSymbols: true,
@@ -47,7 +48,6 @@ export async function GET(request: NextRequest) {
       account
     });
   } catch (error: any) {
-    console.error('[API] 获取账户配置失败:', error);
     return NextResponse.json(
       { error: '获取账户配置失败' },
       { status: 500 }
@@ -81,8 +81,6 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // 测试连接
-    console.log('[API] 测试 Binance 连接...');
     const testResult = await testBinanceConnection(apiKey, apiSecret, isTestnet);
     
     if (!testResult.success) {
@@ -112,20 +110,18 @@ export async function POST(request: NextRequest) {
       }
     });
     
-    console.log('[API] Binance 账户配置成功');
-    
     return NextResponse.json({
       success: true,
       message: '连接成功',
       account: {
         id: account.id,
         isTestnet: account.isTestnet,
-        enableAutoTrade: account.enableAutoTrade
+        enableAutoTrade: account.enableAutoTrade,
+        tradeInterval: account.tradeInterval,
       },
       testData: testResult.data
     });
   } catch (error: any) {
-    console.error('[API] 连接 Binance 失败:', error);
     return NextResponse.json(
       { error: '连接失败: ' + error.message },
       { status: 500 }
@@ -181,8 +177,6 @@ export async function PATCH(request: NextRequest) {
       }
     });
     
-    console.log('[API] 风控配置已更新');
-    
     return NextResponse.json({
       success: true,
       message: '配置已更新',
@@ -195,7 +189,6 @@ export async function PATCH(request: NextRequest) {
       }
     });
   } catch (error: any) {
-    console.error('[API] 更新配置失败:', error);
     return NextResponse.json(
       { error: '更新配置失败' },
       { status: 500 }
@@ -223,14 +216,11 @@ export async function DELETE(request: NextRequest) {
       where: { userId: user.id }
     });
     
-    console.log('[API] Binance 账户已断开');
-    
     return NextResponse.json({
       success: true,
       message: '账户已断开'
     });
   } catch (error: any) {
-    console.error('[API] 断开账户失败:', error);
     return NextResponse.json(
       { error: '断开账户失败' },
       { status: 500 }

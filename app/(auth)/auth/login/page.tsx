@@ -43,7 +43,6 @@ export default function LoginPage() {
       router.push('/trading');
       router.refresh();
     } catch (error) {
-      console.error('登录失败:', error);
       setError('登录失败，请稍后重试');
       setLoading(false);
     }

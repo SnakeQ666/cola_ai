@@ -56,7 +56,6 @@ export default function TradingMonitorPage() {
         });
       }
     } catch (error) {
-      console.error('加载统计失败:', error);
     } finally {
       setLoading(false);
     }

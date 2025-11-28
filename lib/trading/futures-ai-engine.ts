@@ -56,8 +56,6 @@ const SYSTEM_PROMPT = `你是专业的加密货币合约交易AI，负责分析�
 - **避免在震荡市使用高杠杆**`;
 
 export async function runFuturesAIDecision(userId: string) {
-  console.log(`[Futures AI] 开始决策，用户: ${userId}`);
-
   try {
     const { client, account: spotAccount } = await getUserBinanceFuturesClient(userId);
 
@@ -67,7 +65,6 @@ export async function runFuturesAIDecision(userId: string) {
     });
 
     if (!futuresAccount || !futuresAccount.enableAutoTrade) {
-      console.log('[Futures AI] 自动交易未启用');
       return null;
     }
 
@@ -84,7 +81,6 @@ export async function runFuturesAIDecision(userId: string) {
         
         // 如果没有K线数据，跳过这个币种
         if (!klines || klines.length === 0) {
-          console.log(`[Futures AI] ${symbol} 没有K线数据，跳过`);
           continue;
         }
         
@@ -100,7 +96,6 @@ export async function runFuturesAIDecision(userId: string) {
 
         // 如果标记价格为 0，跳过
         if (markPrice === 0) {
-          console.log(`[Futures AI] ${symbol} 标记价格为 0，跳过`);
           continue;
         }
 
@@ -115,13 +110,11 @@ export async function runFuturesAIDecision(userId: string) {
           klines: klines.slice(-5)
         };
       } catch (error) {
-        console.error(`[Futures AI] 获取 ${symbol} 数据失败:`, error);
       }
     }
 
     // 如果没有任何有效的市场数据，返回 null
     if (Object.keys(marketData).length === 0) {
-      console.log('[Futures AI] 没有有效的市场数据，跳过分析');
       return null;
     }
 
@@ -208,7 +201,6 @@ ${positionsInfo}
     });
 
     const reasoning = response.choices[0].message.content || '';
-    console.log('[Futures AI] AI 分析完成');
     
     const decision = parseFuturesAIDecision(reasoning);
 
@@ -248,11 +240,9 @@ ${positionsInfo}
       }
     });
 
-    console.log(`[Futures AI] 决策完成: ${decision.action} ${selectedSymbol}, 杠杆: ${decision.leverage}x, 信心: ${decision.confidence}`);
 
     return { decision, reasoning, aiDecision };
   } catch (error: any) {
-    console.error('[Futures AI] 决策失败:', error);
     throw error;
   }
 }

@@ -72,7 +72,6 @@ export async function POST(req: Request) {
       user,
     })
   } catch (error) {
-    console.error('注册失败:', error)
     return NextResponse.json(
       { error: '注册失败，请稍后重试' },
       { status: 500 }

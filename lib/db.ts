@@ -26,7 +26,6 @@ export async function checkDatabaseConnection(): Promise<boolean> {
     await db.$queryRaw`SELECT 1`;
     return true;
   } catch (error) {
-    console.error('数据库连接失败:', error);
     return false;
   }
 }
