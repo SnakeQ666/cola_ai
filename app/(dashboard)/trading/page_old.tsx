@@ -348,8 +348,8 @@ export default function TradingPage() {
                       </p>
                       <ul className="list-disc list-inside space-y-1 text-amber-800 dark:text-amber-200">
                         <li>强烈建议先使用 Binance 测试网进行验证</li>
-                        <li>API Key 仅需要 "读取" 和 "现货交易" 权限</li>
-                        <li>请勿授予 "提币" 权限</li>
+                        <li>API Key 仅需要 &quot;读取&quot; 和 &quot;现货交易&quot; 权限</li>
+                        <li>请勿授予 &quot;提币&quot; 权限</li>
                         <li>建议限制 IP 白名单</li>
                       </ul>
                     </div>
@@ -760,7 +760,7 @@ export default function TradingPage() {
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  点击 "立即分析" 开始 AI 市场分析
+                  点击 &quot;立即分析&quot; 开始 AI 市场分析
                 </div>
               )}
             </CardContent>

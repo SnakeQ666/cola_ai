@@ -208,17 +208,26 @@ export async function runFuturesAIDecision(userId: string) {
     // 构建市场分析信息
     let marketAnalysis = '';
     for (const [sym, data] of Object.entries(marketData)) {
+      const marketDataItem = data as {
+        markPrice: number;
+        rsi: number;
+        macd: number;
+        ema12: number;
+        ema26: number;
+        boll: { upper: number; middle: number; lower: number };
+        fundingRate: number;
+      };
       marketAnalysis += `
 ${sym}:
-- 标记价格: ${data.markPrice.toFixed(2)}
-- RSI(14): ${data.rsi.toFixed(2)}
-- MACD: ${data.macd.toFixed(2)}
-- EMA12: ${data.ema12.toFixed(2)}
-- EMA26: ${data.ema26.toFixed(2)}
-- 布林带上轨: ${data.boll.upper.toFixed(2)}
-- 布林带中轨: ${data.boll.middle.toFixed(2)}
-- 布林带下轨: ${data.boll.lower.toFixed(2)}
-- 资金费率: ${(data.fundingRate * 100).toFixed(4)}%
+- 标记价格: ${marketDataItem.markPrice.toFixed(2)}
+- RSI(14): ${marketDataItem.rsi.toFixed(2)}
+- MACD: ${marketDataItem.macd.toFixed(2)}
+- EMA12: ${marketDataItem.ema12.toFixed(2)}
+- EMA26: ${marketDataItem.ema26.toFixed(2)}
+- 布林带上轨: ${marketDataItem.boll.upper.toFixed(2)}
+- 布林带中轨: ${marketDataItem.boll.middle.toFixed(2)}
+- 布林带下轨: ${marketDataItem.boll.lower.toFixed(2)}
+- 资金费率: ${(marketDataItem.fundingRate * 100).toFixed(4)}%
 `;
     }
 
