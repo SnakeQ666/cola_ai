@@ -5,8 +5,8 @@
   "packageManager": "pnpm@10.15.1",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
-    "start": "prisma migrate deploy || prisma db push --accept-data-loss; next start",
+    "build": "prisma generate && (prisma migrate deploy || prisma db push --accept-data-loss || true) && next build",
+    "start": "next start",
     "migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "lint": "next lint",
