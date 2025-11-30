@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
           const { client } = await getUserBinanceClient(user.id);
           const { getAccountBalance } = await import('@/lib/binance');
           const accountBalance = await getAccountBalance(client);
-          const prices = await client.prices();
+          const prices = await (client as any).prices();
           
           // 获取所有交易记录
           const allTrades = await db.trade.findMany({
