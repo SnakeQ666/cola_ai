@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     return NextResponse.json(
-      { error: '注册失败，请稍后重试' },
+      { error: '注册失败，请稍后重试：' + error },
       { status: 500 }
     )
   }
