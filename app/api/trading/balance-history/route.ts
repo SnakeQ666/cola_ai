@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const balances: any = {};
     
     // 获取所有币种的当前价格
-    const prices = await client.prices();
+    const prices = await (client as any).prices();
     
     for (const b of balance.balances) {
       balances[b.asset] = b.total;

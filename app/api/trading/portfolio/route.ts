@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     const { client } = await getUserBinanceClient(user.id);
     const { getAccountBalance } = await import('@/lib/binance');
     const accountBalance = await getAccountBalance(client);
-    const prices = await client.prices();
+    const prices = await (client as any).prices();
     
     // 获取当前账户 USDT 余额
     const currentUSDT = accountBalance.balances.find(b => b.asset === 'USDT')?.total || 0;
