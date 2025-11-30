@@ -26,7 +26,7 @@ interface ResponsiveLayoutProps {
 }
 
 const navigation = [
-  { name: '首页', href: '/', icon: Home },
+  { name: '首页', href: '/dashboard', icon: Home },
   { name: 'AI现货交易', href: '/trading', icon: TrendingUp },
   { name: 'AI合约交易', href: '/futures', icon: Zap },
   { name: '设置', href: '/settings', icon: Settings },
@@ -41,7 +41,7 @@ export function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
       {/* 顶部导航栏 - 移动端 */}
       <header className="lg:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-14 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2">
             <Brain className="h-6 w-6 text-primary" />
             <span className="font-semibold">AI交易</span>
           </Link>
@@ -103,10 +103,10 @@ export function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
       <div className="flex">
         {/* PC端侧边栏 */}
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 border-r bg-background">
-          <div className="flex items-center gap-2 h-16 px-6 border-b">
+          <Link href="/dashboard" className="flex items-center gap-2 h-16 px-6 border-b">
             <Brain className="h-8 w-8 text-primary" />
             <span className="text-xl font-bold">AI交易平台</span>
-          </div>
+          </Link>
           
           <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
             {navigation.map((item) => {

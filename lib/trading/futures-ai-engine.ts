@@ -43,17 +43,36 @@ const SYSTEM_PROMPT = `你是专业的加密货币合约交易AI，负责分析�
 - **RSI > 80 或 < 20**：极端超买超卖，谨慎操作
 - **MACD 金叉 + EMA12 > EMA26**：多头信号
 - **MACD 死叉 + EMA12 < EMA26**：空头信号
-- **有持仓时，优先考虑止盈止损**：
-  - 盈利 > 10%：考虑止盈
-  - 亏损 > 5%：考虑止损
-  - 亏损 > 10%：立即止损
-- **杠杆选择**：
-  - 信心高 + 风险低：可用 10-20x
-  - 信心中等：使用 5-10x
-  - 风险高：使用 2-5x
+**⚠️ 平仓规则（非常重要，避免频繁交易导致手续费亏损）**：
+- **手续费成本**：每次开仓+平仓的手续费约为 0.04%-0.1%（双向），盈亏必须足够覆盖手续费
+- **盈利平仓条件**（必须同时满足）：
+  - 盈利幅度 ≥ 3%（ROE ≥ 3%），且
+  - 出现明确的趋势反转信号（如：MACD 死叉/金叉、RSI 极端超买超卖、价格突破关键支撑/阻力位），或
+  - 盈利幅度 ≥ 8%（ROE ≥ 8%）且持仓时间 ≥ 4小时
+  - **禁止**：仅因为小幅盈利（< 3%）就平仓
+- **亏损平仓条件**（必须同时满足）：
+  - 亏损幅度 ≥ 5%（ROE ≤ -5%），且
+  - 趋势明显恶化（如：MACD 持续背离、价格跌破关键支撑/阻力位、RSI 极端超卖/超买），或
+  - 亏损幅度 ≥ 10%（ROE ≤ -10%）立即止损
+  - **禁止**：仅因为小幅亏损（< 5%）就平仓
+- **持仓时间考虑**：
+  - 持仓时间 < 1小时：除非极端情况（亏损 > 10% 或盈利 > 8%），否则继续持有
+  - 持仓时间 1-4小时：需要明确的趋势反转信号才平仓
+  - 持仓时间 ≥ 4小时：可以更灵活地根据盈亏和趋势决定
+- **趋势延续判断**：
+  - 如果当前趋势仍在延续，即使有小幅盈利/亏损，也应继续持有
+  - 只有在趋势明确反转或达到较大盈亏目标时才平仓
+
+**杠杆选择**：
+- 信心高 + 风险低：可用 10-20x
+- 信心中等：使用 5-10x
+- 风险高：使用 2-5x
+
+**其他规则**：
 - **保证金控制**：单仓位不超过用户设定的最大值
 - **资金费率考虑**：费率过高时避免开仓
-- **避免在震荡市使用高杠杆**`;
+- **避免在震荡市使用高杠杆**
+- **避免频繁交易**：每次平仓后，至少等待市场出现明确机会再开新仓`;
 
 export async function runFuturesAIDecision(userId: string) {
   try {
@@ -120,14 +139,44 @@ export async function runFuturesAIDecision(userId: string) {
 
     // 获取当前持仓
     const positions = await getFuturesPositions(client);
+    console.log('[Futures AI] 获取到的持仓数量:', positions.length);
+    console.log('[Futures AI] 持仓数据:', positions);
     let positionsInfo = '无持仓';
     let positionsWithPnl: any[] = [];
 
     if (positions.length > 0) {
+      // 从数据库获取持仓记录以获取开仓时间
+      const dbPositions = await db.futuresPosition.findMany({
+        where: {
+          accountId: futuresAccount.id,
+          status: 'OPEN'
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      console.log('[Futures AI] 数据库中的持仓记录数量:', dbPositions.length);
+      console.log('[Futures AI] 数据库持仓记录:', dbPositions);
+      console.log('[Futures AI] Binance 实时持仓:', positions);
+
       positionsWithPnl = positions.map((p: any) => {
-        const unrealizedPnl = parseFloat(p.unRealizedProfit);
-        const margin = parseFloat(p.isolatedMargin) || parseFloat(p.positionInitialMargin);
+        const unrealizedPnl = parseFloat(p.unRealizedProfit || '0');
+        // 计算保证金：全仓模式下 isolatedMargin 为 0，需要使用 notional 和 leverage
+        const isolatedMargin = parseFloat(p.isolatedMargin || '0');
+        const notional = Math.abs(parseFloat(p.notional || '0')); // 名义价值（取绝对值）
+        const leverage = parseInt(p.leverage || '1');
+        
+        let margin = 0;
+        if (isolatedMargin > 0) {
+          // 逐仓模式
+          margin = isolatedMargin;
+        } else if (notional > 0 && leverage > 0) {
+          // 全仓模式：保证金 = 名义价值 / 杠杆倍数
+          margin = notional / leverage;
+        }
+        
         const roe = margin > 0 ? (unrealizedPnl / margin) * 100 : 0;
+        const dbPos = dbPositions.find(dp => dp.symbol === p.symbol && dp.side === (parseFloat(p.positionAmt) > 0 ? 'LONG' : 'SHORT'));
+        const createdAt = dbPos?.createdAt || new Date();
+        const holdingHours = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
 
         return {
           symbol: p.symbol,
@@ -138,14 +187,20 @@ export async function runFuturesAIDecision(userId: string) {
           leverage: parseInt(p.leverage),
           unrealizedPnl,
           roe,
-          liquidationPrice: parseFloat(p.liquidationPrice)
+          liquidationPrice: parseFloat(p.liquidationPrice),
+          holdingHours
         };
       });
 
       positionsInfo = positionsWithPnl
         .map(p => {
           const pnlSign = p.unrealizedPnl >= 0 ? '+' : '';
-          return `${p.symbol} ${p.side} ${p.leverage}x: 开仓价 $${p.entryPrice}, 标记价 $${p.markPrice}, 盈亏 ${pnlSign}$${p.unrealizedPnl.toFixed(2)} (${pnlSign}${p.roe.toFixed(2)}%), 强平价 $${p.liquidationPrice}`;
+          const holdingTime = p.holdingHours < 1 
+            ? `${(p.holdingHours * 60).toFixed(0)}分钟`
+            : p.holdingHours < 24
+            ? `${p.holdingHours.toFixed(1)}小时`
+            : `${(p.holdingHours / 24).toFixed(1)}天`;
+          return `${p.symbol} ${p.side} ${p.leverage}x: 开仓价 $${p.entryPrice}, 标记价 $${p.markPrice}, 盈亏 ${pnlSign}$${p.unrealizedPnl.toFixed(2)} (${pnlSign}${p.roe.toFixed(2)}%), 强平价 $${p.liquidationPrice}, 持仓时间 ${holdingTime}`;
         })
         .join('\n');
     }
@@ -186,9 +241,15 @@ ${positionsInfo}
 1. **必须明确给出"交易币种"**
 2. **必须给出具体的杠杆倍数和保证金**
 3. **必须设置止损和止盈价格**
-4. 如果有持仓，优先判断是否该止盈或止损
+4. **如果有持仓，判断是否平仓时，必须严格遵守平仓规则**：
+   - 计算当前盈亏百分比（ROE）
+   - 评估趋势是否反转
+   - 考虑持仓时间
+   - **只有在盈亏足够覆盖手续费且有明确趋势反转信号时，才建议平仓**
+   - **避免因为小幅波动（< 3% 盈利或 < 5% 亏损）就平仓**
 5. 考虑资金费率，费率过高时避免开仓
-6. 分析所有币种，选择最优机会`;
+6. 分析所有币种，选择最优机会
+7. **优先考虑趋势延续，而不是频繁交易**`;
 
     const response = await deepseek.chat.completions.create({
       model: 'deepseek-chat',

@@ -70,21 +70,6 @@ export async function GET(request: NextRequest) {
       });
       
       if (openOrder) {
-        // 查找对应的持仓记录以获取杠杆信息
-        const position = await db.futuresPosition.findFirst({
-          where: {
-            accountId: futuresAccount.id,
-            symbol: closeOrder.symbol,
-            side: closeOrder.positionSide,
-            status: 'CLOSED',
-            closedAt: {
-              gte: closeOrder.executedAt,
-              lte: new Date(closeOrder.executedAt.getTime() + 60000) // 平仓后1分钟内
-            }
-          },
-          orderBy: { closedAt: 'desc' }
-        });
-        
         // 计算持仓时长
         const duration = closeOrder.executedAt.getTime() - openOrder.executedAt.getTime();
         const durationHours = duration / (1000 * 60 * 60);
@@ -97,11 +82,14 @@ export async function GET(request: NextRequest) {
           ? (parseFloat(closeOrder.pnl?.toString() || '0') / openCost) * 100 
           : 0;
         
+        // 从开仓订单或平仓订单获取杠杆倍数（优先使用开仓订单的杠杆）
+        const leverage = (openOrder as any).leverage || (closeOrder as any).leverage || null;
+        
         closedPositions.push({
           id: closeOrder.id,
           symbol: closeOrder.symbol,
           positionSide: closeOrder.positionSide,
-          leverage: position?.leverage || null,
+          leverage: leverage,
           // 开仓信息
           openOrder: {
             orderId: openOrder.orderId,
@@ -120,6 +108,8 @@ export async function GET(request: NextRequest) {
           // 盈亏信息
           pnl: parseFloat(closeOrder.pnl?.toString() || '0'),
           pnlPercent,
+          // 灰烬平仓标记
+          isDustClose: (closeOrder as any).isDustClose || false,
           // 持仓时长
           duration: {
             hours: Math.floor(durationHours),

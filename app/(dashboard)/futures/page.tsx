@@ -637,7 +637,7 @@ export default function FuturesPage() {
           <CardContent>
             <div className="max-h-[600px] overflow-y-auto space-y-4 pr-2">
               {closedPositions.map((position, index) => (
-                <div key={position.id || index} className="p-4 border rounded-lg">
+                <div key={position.id || index} className={`p-4 border rounded-lg ${position.isDustClose ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' : ''}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-lg">{position.symbol}</span>
@@ -645,6 +645,11 @@ export default function FuturesPage() {
                         {position.positionSide}
                         {position.leverage && ` ${position.leverage}x`}
                       </Badge>
+                      {position.isDustClose && (
+                        <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
+                          灰烬平仓
+                        </Badge>
+                      )}
                     </div>
                     <div className={`text-lg font-bold ${position.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                       {position.pnl >= 0 ? '+' : ''}${position.pnl.toFixed(2)}
@@ -653,6 +658,11 @@ export default function FuturesPage() {
                       </span>
                     </div>
                   </div>
+                  {position.isDustClose && (
+                    <div className="mb-3 p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded text-xs text-yellow-800 dark:text-yellow-200">
+                      ⚠️ 灰烬平仓：此订单平的是之前未完全平仓的剩余仓位，可能是由于第一次平仓时数量不准确导致的。
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
                     <div>
@@ -827,8 +837,8 @@ export default function FuturesPage() {
                                   
                                   数量: {order.quantity} | 价格: ${Number(order?.avgPrice)?.toFixed(2)}
                                   {order.pnl && (
-                                    <span className={order.pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
-                                      {' '}| PnL: {order.pnl >= 0 ? '+' : ''}${order.pnl.toFixed(2)}
+                                    <span className={Number(order.pnl) >= 0 ? 'text-green-500' : 'text-red-500'}>
+                                      {' '}| PnL: {Number(order.pnl) >= 0 ? '+' : ''}${Number(order.pnl).toFixed(2)}
                                     </span>
                                   )}
                                 </div>

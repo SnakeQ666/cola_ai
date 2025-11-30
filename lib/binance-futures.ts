@@ -144,7 +144,8 @@ export async function placeFuturesMarketOrder(
   symbol: string,
   side: 'BUY' | 'SELL',
   quantity: number,
-  positionSide?: 'LONG' | 'SHORT'
+  positionSide?: 'LONG' | 'SHORT',
+  reduceOnly?: boolean
 ) {
   try {
     // 检查持仓模式
@@ -169,6 +170,11 @@ export async function placeFuturesMarketOrder(
       // 不设置 positionSide 参数
     }
 
+    // 如果是指定平仓，设置 reduceOnly 参数
+    if (reduceOnly) {
+      orderParams.reduceOnly = true;
+    }
+
     const order = await client.futuresOrder(orderParams);
     
     // 如果市价单没有立即返回 avgPrice，查询订单详情
@@ -190,23 +196,41 @@ export async function placeFuturesMarketOrder(
   }
 }
 
-// 平仓（市价）
+// 平仓（市价）- 使用 reduceOnly 确保完全平仓
 export async function closeFuturesPosition(
   client: any,
   symbol: string,
   positionSide: 'LONG' | 'SHORT',
-  quantity: number
+  quantity?: number
 ) {
   try {
+    // 如果没有指定数量，先获取当前持仓数量
+    let closeQuantity = quantity;
+    if (!closeQuantity) {
+      const positions = await getFuturesPositions(client, symbol);
+      const position = positions.find((p: any) => {
+        const pSide = parseFloat(p.positionAmt) > 0 ? 'LONG' : 'SHORT';
+        return p.symbol === symbol && pSide === positionSide;
+      });
+      
+      if (!position) {
+        throw new Error(`未找到 ${symbol} ${positionSide} 持仓`);
+      }
+      
+      closeQuantity = Math.abs(parseFloat(position.positionAmt));
+    }
+    
     // LONG 仓位用 SELL 平仓，SHORT 仓位用 BUY 平仓
     const side = positionSide === 'LONG' ? 'SELL' : 'BUY';
     
+    // 使用 reduceOnly=true 确保只减少持仓，不会开反向仓位
     const order = await placeFuturesMarketOrder(
       client,
       symbol,
       side,
-      quantity,
-      positionSide
+      closeQuantity,
+      positionSide,
+      true // reduceOnly = true
     );
     
     return order;

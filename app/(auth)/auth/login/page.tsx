@@ -39,8 +39,8 @@ export default function LoginPage() {
         return;
       }
 
-      // 登录成功，跳转到交易页面
-      router.push('/trading');
+      // 登录成功，跳转到首页（数据大盘）
+      router.push('/dashboard');
       router.refresh();
     } catch (error) {
       setError('登录失败，请稍后重试');

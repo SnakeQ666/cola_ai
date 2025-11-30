@@ -285,12 +285,14 @@ model FuturesOrder {
   quantity        Decimal  @db.Decimal(20, 8) // 数量
   executedQty     Decimal  @db.Decimal(20, 8) // 成交数量
   avgPrice        Decimal? @db.Decimal(20, 8) // 成交均价
+  leverage        Int?     // 杠杆倍数
   
   // 状态
   status          String   // NEW / FILLED / CANCELED / EXPIRED
   
   // 盈亏信息
   pnl             Decimal? @db.Decimal(20, 8) // 已实现盈亏（平仓时记录）
+  isDustClose     Boolean  @default(false) // 是否为灰烬平仓（平之前没平干净的仓位）
   
   // AI 决策信息
   aiDecisionId    String?

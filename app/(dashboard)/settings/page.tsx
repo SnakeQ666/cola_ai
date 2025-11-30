@@ -6,7 +6,7 @@ import { signOut } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { User, Key, Bell, Shield, LogOut, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
+import { User, LogOut, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface UserProfile {
@@ -243,37 +243,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* 安全设置 */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            <CardTitle>安全设置</CardTitle>
-          </div>
-          <CardDescription>保护您的账户安全</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">修改密码</p>
-              <p className="text-sm text-muted-foreground">定期更新您的密码</p>
-            </div>
-            <Button variant="outline" disabled>
-              修改
-            </Button>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">两步验证</p>
-              <p className="text-sm text-muted-foreground">增强账户安全性</p>
-            </div>
-            <Button variant="outline" disabled>
-              启用
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* 账户操作 */}
       <Card>
         <CardHeader>
@@ -300,54 +269,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* API密钥 */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Key className="h-5 w-5" />
-            <CardTitle>API密钥</CardTitle>
-          </div>
-          <CardDescription>管理您的API访问密钥</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Input value="sk-xxxxxxxxxxxxxxxx" readOnly />
-              <Button variant="outline">复制</Button>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              请妥善保管您的API密钥，不要分享给他人
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 通知设置 */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
-            <CardTitle>通知设置</CardTitle>
-          </div>
-          <CardDescription>选择您想接收的通知</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">邮件通知</p>
-              <p className="text-sm text-muted-foreground">接收分析完成通知</p>
-            </div>
-            <input type="checkbox" defaultChecked />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">系统更新</p>
-              <p className="text-sm text-muted-foreground">接收新功能和更新通知</p>
-            </div>
-            <input type="checkbox" defaultChecked />
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
