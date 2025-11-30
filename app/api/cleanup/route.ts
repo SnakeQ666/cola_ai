@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         select: { id: true }
       });
 
-      const recentIds = recentDecisions.map(d => d.id);
+      const recentIds = recentDecisions.map((d: { id: string }) => d.id);
 
       // 删除旧决策（但保留关联的 Trade 记录）
       if (recentIds.length > 0) {
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
         select: { id: true }
       });
 
-      const recentIds = recentDecisions.map(d => d.id);
+      const recentIds = recentDecisions.map((d: { id: string }) => d.id);
 
       if (recentIds.length > 0) {
         // 先将旧决策的 Order 记录的 aiDecisionId 设置为 null
