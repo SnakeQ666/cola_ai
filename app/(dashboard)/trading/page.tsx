@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Wallet, AlertTriangle, CheckCircle2, Settings, ArrowRightLeft, History, Activity, TrendingUp } from 'lucide-react';
+import { Loader2, Wallet, AlertTriangle, CheckCircle2, Settings, Repeat, History, Activity, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -347,8 +347,8 @@ export default function TradingPage() {
                       </p>
                       <ul className="list-disc list-inside space-y-1 text-amber-800 dark:text-amber-200">
                         <li>强烈建议先使用 Binance 测试网进行验证</li>
-                        <li>API Key 仅需要 "读取" 和 "现货交易" 权限</li>
-                        <li>请勿授予 "提币" 权限</li>
+                        <li>API Key 仅需要 &quot;读取&quot; 和 &quot;现货交易&quot; 权限</li>
+                        <li>请勿授予 &quot;提币&quot; 权限</li>
                         <li>建议限制 IP 白名单</li>
                       </ul>
                     </div>
@@ -482,7 +482,7 @@ export default function TradingPage() {
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <Button variant="outline" size="sm" onClick={() => router.push('/trading/manual')}>
-                  <ArrowRightLeft className="w-4 h-4 mr-2" />
+                  <Repeat className="w-4 h-4 mr-2" />
                   手动交易
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => router.push('/trading/history')}>
@@ -760,7 +760,7 @@ export default function TradingPage() {
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  点击 "立即分析" 开始 AI 市场分析
+                  点击 &quot;立即分析&quot; 开始 AI 市场分析
                 </div>
               )}
             </CardContent>
