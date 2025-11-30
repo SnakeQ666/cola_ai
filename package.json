@@ -5,9 +5,10 @@
   "packageManager": "pnpm@10.15.1",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "postinstall": "prisma generate",
     "docker:build": "docker build -t ai-crypto-trading:latest .",
     "docker:run": "docker run -p 3000:3000 ai-crypto-trading:latest",
     "deploy:sae": "sh scripts/deploy-sae.sh"
