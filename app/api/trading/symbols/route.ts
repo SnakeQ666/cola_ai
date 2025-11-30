@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     
     const { client } = await getUserBinanceClient(user.id);
     
-    const exchangeInfo = await client.exchangeInfo();
+    const exchangeInfo = await (client as any).exchangeInfo();
     
     const usdtPairs = exchangeInfo.symbols
       .filter((s: any) => 

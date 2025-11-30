@@ -56,7 +56,7 @@ export async function testBinanceConnection(
     const client = createBinanceClient(apiKey, apiSecret, isTestnet);
     
     // 测试连接：获取账户信息
-    const accountInfo = await client.accountInfo();
+    const accountInfo = await (client as any).accountInfo();
     
     return {
       success: true,
