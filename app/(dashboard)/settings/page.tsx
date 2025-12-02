@@ -182,6 +182,12 @@ export default function SettingsPage() {
                   const f = e.target.files?.[0] || null
                   setAvatarFile(f)
                   if (f) {
+                    // 前端限制：最大 2MB
+                    const maxSize = 2 * 1024 * 1024
+                    if (f.size > maxSize) {
+                      toast.error('头像大小不能超过 2MB')
+                      return
+                    }
                     // 选择后自动上传
                     void handleUploadAvatar(f)
                   }

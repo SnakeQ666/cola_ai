@@ -337,7 +337,7 @@ export default function HomePage() {
             <h3 className="text-5xl md:text-7xl font-black mb-6 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
               选择您的交易方式
             </h3>
-            <p className="text-2xl text-slate-400">现货交易 · 合约交易 · 更多即将推出</p>
+            <p className="text-2xl text-slate-400">现货交易 · 合约交易 · 合约功能已完成</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
@@ -398,9 +398,9 @@ export default function HomePage() {
                     <div className="p-4 bg-purple-500/20 rounded-2xl backdrop-blur-sm">
                       <Zap className="h-12 w-12 text-purple-400" />
                     </div>
-                    <div className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-300 text-sm font-bold rounded-full border border-purple-500/30">
-                      <Rocket className="h-4 w-4" />
-                      即将推出
+                    <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-300 text-sm font-bold rounded-full border border-green-500/30">
+                      <CheckCircle2 className="h-4 w-4" />
+                      已上线
                     </div>
                   </div>
                   <h4 className="text-4xl font-black text-white mb-4">AI 合约交易</h4>
@@ -423,12 +423,14 @@ export default function HomePage() {
                       );
                     })}
                   </ul>
-                  <Button className="w-full h-14 text-lg bg-purple-600/50 hover:bg-purple-600/70 text-white border-0 cursor-not-allowed" disabled>
-                    <span className="flex items-center justify-center gap-2">
-                      开发中
-                      <Rocket className="h-5 w-5" />
-                    </span>
-                  </Button>
+                  <Link href="/auth/register">
+                    <Button className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 shadow-xl group-hover:shadow-2xl group-hover:shadow-purple-500/50 transition-all relative overflow-hidden group/btn">
+                      <span className="relative z-10 flex items-center justify-center gap-2">
+                        开始合约交易
+                        <ArrowRight className="h-5 w-5 group-hover/btn:translate-x-2 transition-transform" />
+                      </span>
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </div>
