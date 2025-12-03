@@ -19,9 +19,7 @@ export const authOptions: NextAuthOptions = {
     signOut: '/auth/login',
     error: '/auth/login',
   },
-  // 确保在生产环境中正确使用 NEXTAUTH_URL
-  // @ts-ignore - trustHost 在 NextAuth v4.21+ 中可用，但类型定义可能未更新
-  trustHost: true,
+
   providers: [
     CredentialsProvider({
       name: 'credentials',
