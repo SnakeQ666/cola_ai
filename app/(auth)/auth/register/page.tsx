@@ -133,6 +133,7 @@ export default function RegisterPage() {
 
       // 登录成功，跳转到首页（数据大盘）
       // 使用 window.location.href 确保完整的页面刷新和 session 验证
+      // 注意：window.location.href 本身就会触发完整页面导航，不需要额外的 reload()
       window.location.href = '/dashboard';
     } catch (error) {
       setError('注册失败，请稍后重试');
