@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Brain, AlertCircle, TrendingUp, Sparkles, Lock, Mail, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,8 +38,8 @@ export default function LoginPage() {
       }
 
       // 登录成功，跳转到首页（数据大盘）
-      router.push('/dashboard');
-      router.refresh();
+      // 使用 window.location.href 确保完整的页面刷新和 session 验证
+      window.location.href = '/dashboard';
     } catch (error) {
       setError('登录失败，请稍后重试');
       setLoading(false);

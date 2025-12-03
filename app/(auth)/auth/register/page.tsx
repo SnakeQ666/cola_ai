@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +47,6 @@ const getPasswordStrength = (password: string): 'weak' | 'medium' | 'strong' => 
 };
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -134,8 +132,8 @@ export default function RegisterPage() {
       }
 
       // 登录成功，跳转到首页（数据大盘）
-      router.push('/dashboard');
-      router.refresh();
+      // 使用 window.location.href 确保完整的页面刷新和 session 验证
+      window.location.href = '/dashboard';
     } catch (error) {
       setError('注册失败，请稍后重试');
       setLoading(false);
