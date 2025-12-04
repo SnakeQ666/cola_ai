@@ -15,7 +15,6 @@ import {
   X,
   Home,
   Settings,
-  User,
   Brain,
   TrendingUp,
   Zap,
@@ -85,17 +84,6 @@ export function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
                 </Link>
               )
             })}
-            
-            <div className="border-t my-4" />
-            
-            <Link
-              href="/settings/profile"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-3 rounded-lg px-3 py-3 text-base text-muted-foreground hover:bg-accent"
-            >
-              <User className="h-5 w-5" />
-              个人中心
-            </Link>
           </nav>
         </div>
       )}
@@ -130,16 +118,6 @@ export function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
               )
             })}
           </nav>
-          
-          <div className="border-t p-4">
-            <Link
-              href="/settings/profile"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent"
-            >
-              <User className="h-5 w-5" />
-              个人中心
-            </Link>
-          </div>
         </aside>
 
         {/* 主内容区 */}
