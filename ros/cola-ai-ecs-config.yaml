@@ -5,7 +5,7 @@ parameters:
   VpcName: cola-ai-from-github
 
 tags:
-  env: prodfuction
+  env: production
 
 
 
