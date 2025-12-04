@@ -1,0 +1,28 @@
+ROSTemplateFormatVersion: "2015-09-01"
+Description:
+  zh-cn: 通过代码仓库创建一个简单的 VPC 示例（与阿里云文档示例一致）
+
+Parameters:
+  VpcName:
+    Type: String
+    Default: cola-ai-vpc
+    Description:
+      zh-cn: VPC 名称
+
+Resources:
+  Vpc:
+    Type: ALIYUN::ECS::VPC
+    Properties:
+      VpcName:
+        Ref: VpcName
+      CidrBlock: 192.168.0.0/16
+
+Outputs:
+  VpcId:
+    Value:
+      Ref: Vpc
+    Description:
+      zh-cn: 创建的 VPC ID
+
+
+

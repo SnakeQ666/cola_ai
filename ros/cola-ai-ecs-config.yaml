@@ -1,0 +1,11 @@
+template-file-path: templates/ecs-app.yaml
+
+parameters:
+  # 对应模板里的 VpcName 参数
+  VpcName: cola-ai-from-github
+
+tags:
+  env: prodfuction
+
+
+
