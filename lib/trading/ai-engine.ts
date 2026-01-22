@@ -302,6 +302,7 @@ ${totalPnL !== 0 ? `总盈亏: ${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)
         riskLevel: decision.riskLevel,
         action: decision.action,
         symbol: selectedSymbol,
+        tradeAmount: decision.tradeAmount > 0 ? new Decimal(decision.tradeAmount) : null,
         targetPrice: decision.targetPrice ? new Decimal(decision.targetPrice) : null,
         targetQuantity: decision.targetQuantity ? new Decimal(decision.targetQuantity) : null,
       }

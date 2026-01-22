@@ -157,6 +157,7 @@ model AIDecision {
   // 决策结果
   action          String   // BUY / SELL / HOLD
   symbol          String?
+  tradeAmount     Decimal? @db.Decimal(20, 2) // AI 建议的交易金额（USDT）
   targetPrice     Decimal? @db.Decimal(20, 8)
   targetQuantity  Decimal? @db.Decimal(20, 8)
   

@@ -722,7 +722,7 @@ export default function TradingPage() {
                     <div className="p-4 bg-secondary rounded-lg">
                       <div className="text-sm text-muted-foreground">建议金额</div>
                       <div className="text-2xl font-bold mt-1">
-                        ${latestDecision.tradeAmount ? latestDecision.tradeAmount.toFixed(2) : '0.00'}
+                        ${latestDecision.tradeAmount ? parseFloat(latestDecision.tradeAmount.toString()).toFixed(2) : '0.00'}
                       </div>
                     </div>
                     
@@ -843,7 +843,7 @@ export default function TradingPage() {
                             <div className="p-2 bg-secondary rounded">
                               <div className="text-xs text-muted-foreground">建议金额</div>
                               <div className="text-sm font-semibold mt-1">
-                                ${decision.targetQuantity ? parseFloat(decision.targetQuantity.toString()).toFixed(2) : '0.00'}
+                                ${decision.tradeAmount ? parseFloat(decision.tradeAmount.toString()).toFixed(2) : '0.00'}
                               </div>
                             </div>
                             <div className="p-2 bg-secondary rounded">
